@@ -42,6 +42,7 @@ contract BaseBionetTest is Test {
 
         vm.deal(seller, WALLET_FUNDING);
         vm.startPrank(seller);
+        // Deploy and IP Asset the seller will offer
         ipAsset = new MockAsset();
         vm.stopPrank();
     }
