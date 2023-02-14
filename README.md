@@ -10,7 +10,7 @@ This work is **heavily** inspired by the great work on the [Boson protocol](http
 ## Design
 There are 3 main actors in the protocol: **buyer**, **seller**, and the **exchange**. A buyer and seller may want to exchange both digital and physical assets. The exchange contains the core logic and state machine. A state machine ensures the buyer and seller follow the rules of the system. Each state dictates the rewards and penalities that may impact the exchange.  The goal is to incentive participants to follow the rules.  And by following the rules, both parties get what they want, which helps to build trust in the system over time.
 
-Buyers and sellers may exchange digital or physical assets (often referred to as *"phygitals"*), or a service.  The current state of SynBio often requires off-chain negotiation related to an exchange which can be time consuming. The protocol takes this into consideration and is being designed to help encourage participants to keep moving forward (through states) till the exchange is finalized.
+Buyers and sellers may exchange digital or physical assets (often referred to as *"phygitals"*), or a service.  The current state of SynBio often requires off-chain negotiation related to an exchange which can be time consuming. The protocol takes this into consideration and is being designed to help encourage participants to keep moving forward (through states) until the exchange is finalized.
 
 ### High-level Flow
 
