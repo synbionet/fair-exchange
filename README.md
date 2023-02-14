@@ -60,7 +60,7 @@ Voided is a state we didn't mention earlier. A seller can void a listed asset at
 * When a buyer **commits** to a sale, they commit **price**. Escrowing it with the exchange.
 * Only a seller can **revoke** a sale. Doing so will cost them **RCF**. This will reward the buyer with **price + RCF**
 * A Buyer can **cancel** a sale. This does the opposite of revoke. Reducing the refund to the buyer by **price - RCF** and rewarding the seller with **RCF**.
-* A **completed** exchange pays a fee to the protocol/network. Ther seller pays the fee. They will receive **price - CF**. The procotol receives **CF**
+* A **completed** exchange pays a fee to the protocol/network. The seller pays the fee. They will receive **price - CF**. The procotol receives **CF**
 
 The timers mentioned earlier will enforce the same fees.
 
