@@ -37,7 +37,7 @@ To deal with the need for off-chain negotiations in SynBio and the potential for
 
 Overall, this is designed to keep the process moving.  Either the buyer and seller must act or the protocol will act for them.
 
-![State Diagrem](./docs/fair-exchange.svg)
+![State Diagrem](./docs/fair-exchange-state.svg)
 
 ## Fees
 Fees are used to incentive actors to do the right thing.  For example, a seller is less likely to revoke a sale when they have to pay to do so. 
