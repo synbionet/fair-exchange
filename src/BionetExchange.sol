@@ -2,27 +2,29 @@
 pragma solidity ^0.8.16;
 
 import "./BionetTypes.sol";
+import "./libs/FundsLib.sol";
 import "./BionetConstants.sol";
 import "./libs/CountersLib.sol";
-import "./libs/FundsLib.sol";
 import "./interfaces/IBionetFunds.sol";
 import "./interfaces/IBionetVoucher.sol";
 import "./interfaces/IBionetExchange.sol";
 
 import "openzeppelin/utils/Address.sol";
-import "openzeppelin/token/ERC1155/IERC1155.sol";
 import "openzeppelin/security/ReentrancyGuard.sol";
-import "openzeppelin/utils/introspection/ERC165Checker.sol";
 
-import "forge-std/console2.sol";
-
+/**
+ * @dev Core logic of Bionet
+ */
 contract BionetExchange is IBionetExchange, ReentrancyGuard {
     using Address for address payable;
     using CountersLib for CountersLib.Counter;
     CountersLib.Counter private _counter;
 
+    // Address of the Funds contract
     address fundsAddress;
+    // Address of the Router
     address routerAddress;
+    // Address of the Voucher
     address voucherAddress;
 
     // offerid => offer
@@ -35,6 +37,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @dev Set the required addresses
+     */
     constructor(
         address _router,
         address _funds,
@@ -45,52 +50,60 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         voucherAddress = _voucher;
     }
 
-    function createOffer(address _caller, BionetTypes.Offer memory _offer)
+    /**
+     * @dev See {IBionetExchange}
+     *
+     * Emits OfferCreated
+     */
+    function createOffer(BionetTypes.Offer memory _offer)
         external
         onlyRouter
-        nonReentrant
         returns (uint256)
     {
-        // check for valid asset contract
-        bool validAsset = ERC165Checker.supportsInterface(
-            _offer.assetToken,
-            type(IERC1155).interfaceId
-        );
-        require(validAsset, NOT_ASSET);
-
-        // check the caller owns the asset
-        uint256 num = IERC1155(_offer.assetToken).balanceOf(
-            _caller,
-            _offer.assetTokenId
-        );
-        require(num >= _offer.quantityAvailable, NOT_OWNER);
-
         uint256 oid = _counter.nextOfferId();
         _offer.id = oid;
         offers[oid] = _offer;
 
         emit OfferCreated(oid, _offer.seller, _offer);
-
         return oid;
     }
 
+    /**
+     * @dev See {IBionetExchange}
+     *
+     * Sets the offer as voided, which should 'de-list' it on
+     * the market. Emits OfferCreated
+     *
+     * Will revert if:
+     *  - Caller is not the seller listed in the offer
+     */
     function voidOffer(address _caller, uint256 _offerId) external onlyRouter {
         BionetTypes.Offer storage offer = getValidOffer(_offerId);
-        require(_caller == offer.seller, "Not the seller of the offer");
+        require(_caller == offer.seller, SELLER_NOT_CALLER);
         offer.voided = true;
         emit OfferVoided(_offerId, _caller);
     }
 
+    /**
+     * @dev See {IBionetExchange}
+     *
+     * Creates an Exchange between the buyer and seller. Escrows funds.
+     * Issues a voucher to the buyer. Emits OfferCommitted.
+     *
+     * Will revert if:
+     *  - Offer doesn't exist
+     *  - Offer has been voided
+     *  - The buyer doesn't send enough money for the price of the offer
+     */
     function commit(address _buyer, uint256 _offerId)
         external
         payable
         onlyRouter
-        nonReentrant
         returns (uint256)
     {
-        // Check the offer exists and is not voided
+        // check the offer exists and is not voided
         BionetTypes.Offer memory offer = getValidOffer(_offerId);
-        require(msg.value >= offer.price, "Not enough money");
+        require(msg.value >= offer.price, INSUFFICIENT_FUNDS);
 
         // create the exchange
         uint256 eid = _counter.nextExchangeId();
@@ -98,7 +111,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         exchange.id = eid;
         exchange.offerId = _offerId;
         exchange.buyer = _buyer;
-        exchange.redeemBy = block.timestamp + WEEK;
+        exchange.redeemBy = block.timestamp + WEEK; // Set the redeem timer
         exchange.state = BionetTypes.ExchangeState.Committed;
 
         // escrow the funds
@@ -111,38 +124,36 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         // issue token to buyer
         IBionetVoucher(voucherAddress).issueVoucher(_buyer, eid);
 
-        // TODO: Track time till redeemtion is due...
-
         // emit event
         emit OfferCommitted(_offerId, eid, _buyer);
         return eid;
     }
 
+    /**
+     * See {IBionetExchange}
+     *
+     * Only the buyer can cancel.  Doing so is a penalty.  This
+     * will release funds and emit an event
+     *
+     * Will revert if:
+     *  - Exchange doesn't exist
+     *  - Exchange is NOT in the committed state
+     *  - Caller is not the exchange buyer
+     */
     function cancel(address _buyer, uint256 _exchangeId) external onlyRouter {
-        (bool exists, BionetTypes.Exchange storage exchange) = fetchExchange(
+        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
             _exchangeId
-        );
-        require(exists, "Exchange does not exist");
-        require(
-            isValidExchangeState(
-                exchange.state,
-                BionetTypes.ExchangeState.Committed
-            ),
-            "Must be in committed state"
         );
         require(_buyer == exchange.buyer, BUYER_NOT_CALLER);
 
         // It doesn't matter if the voucher expired or not, still canceling...
+        // as the fee is the same
         exchange.state = BionetTypes.ExchangeState.Canceled;
         exchange.finalizedDate = block.timestamp;
 
+        // Get some information from the offer needed to finalize
         BionetTypes.Offer memory offer = offers[exchange.offerId];
-
-        // burn the voucher
-        IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
-
-        // release funds
-        IBionetFunds(fundsAddress).releaseFunds(
+        finalizeCommittment(
             exchange.id,
             offer.seller,
             exchange.buyer,
@@ -153,41 +164,42 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         emit OfferCanceled(offer.id, exchange.id, exchange.buyer, false);
     }
 
+    /**
+     * See {IBionetExchange}
+     *
+     * Called by seller to revoke a committment. Also checks
+     * redeem timer and may cancel versus revoke if the timer
+     * has expired.  If the timer has expired the seller is
+     * reimbursed the msg.value sent.  Exchange must be in Committment state.
+     *
+     * Emits event
+     *
+     * Will revert if:
+     *  - Exchange doesn't exist
+     *  - Exchange is NOT in the committed state
+     *  - Caller is not the seller
+     */
     function revoke(address _caller, uint256 _exchangeId)
         external
         payable
         onlyRouter
         nonReentrant
     {
-        (bool exists, BionetTypes.Exchange storage exchange) = fetchExchange(
+        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
             _exchangeId
-        );
-        require(exists, "Exchange does not exist");
-
-        // check in a valid state
-        require(
-            isValidExchangeState(
-                exchange.state,
-                BionetTypes.ExchangeState.Committed
-            ),
-            "Must be in committed state"
         );
 
         BionetTypes.Offer memory offer = offers[exchange.offerId];
-        // must be the seller
         require(_caller == offer.seller, SELLER_NOT_CALLER);
 
-        // check if voucher expired
+        // check if voucher expired (redeem period)
         bool voucherExpired = block.timestamp > exchange.redeemBy;
         if (voucherExpired) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
             exchange.finalizedDate = block.timestamp;
 
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
-
-            IBionetFunds(fundsAddress).releaseFunds(
+            finalizeCommittment(
                 exchange.id,
                 offer.seller,
                 exchange.buyer,
@@ -195,7 +207,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
                 exchange.state
             );
 
-            // reimburse money sent with this transaction
+            // reimburse seller the money sent with this transaction
             if (msg.value > 0) payable(_caller).sendValue(msg.value);
 
             emit OfferCanceled(offer.id, exchange.id, exchange.buyer, true);
@@ -210,11 +222,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.state = BionetTypes.ExchangeState.Revoked;
             exchange.finalizedDate = block.timestamp;
 
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
-
-            // release funds
-            IBionetFunds(fundsAddress).releaseFunds(
+            finalizeCommittment(
                 exchange.id,
                 offer.seller,
                 exchange.buyer,
@@ -226,36 +234,34 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         }
     }
 
+    /**
+     * @dev See {IBionetExchange}
+     *
+     * Called by buyer to redeem a voucher issued during commit.
+     * If the voucher expired it's canceled by the protocol and
+     * the buyer pays a penalty.  Otherwise we update state, burn the
+     * voucher and start the dispute time.
+     * Emit event.
+     *
+     * Will revert if:
+     *  - Exchange doesn't exist
+     *  - Exchange is NOT in the committed state
+     *  - Caller is not the buyer
+     */
     function redeem(address _buyer, uint256 _exchangeId) external onlyRouter {
-        (bool exists, BionetTypes.Exchange storage exchange) = fetchExchange(
+        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
             _exchangeId
         );
-        require(exists, "Exchange does not exist");
-
-        // check in a valid state
-        require(
-            isValidExchangeState(
-                exchange.state,
-                BionetTypes.ExchangeState.Committed
-            ),
-            "Must be in committed state"
-        );
-
         require(exchange.buyer == _buyer, BUYER_NOT_CALLER);
 
         BionetTypes.Offer memory offer = offers[exchange.offerId];
-
         bool voucherExpired = block.timestamp > exchange.redeemBy;
         if (voucherExpired) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
             exchange.finalizedDate = block.timestamp;
 
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
-
-            // fine the buyer...
-            IBionetFunds(fundsAddress).releaseFunds(
+            finalizeCommittment(
                 exchange.id,
                 offer.seller,
                 exchange.buyer,
@@ -265,8 +271,11 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
             emit OfferCanceled(offer.id, exchange.id, exchange.buyer, true);
         } else {
+            // Move to the redeemed state
             exchange.state = BionetTypes.ExchangeState.Redeemed;
+            // Start the dispute timer
             exchange.disputeBy = block.timestamp + WEEK;
+
             // burn the voucher
             IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
 
@@ -279,10 +288,11 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         }
     }
 
-    function finalize() external {}
-
     /** Views **/
 
+    /**
+     * Get an Offer by ID
+     */
     function getOffer(uint256 _offerId)
         public
         view
@@ -292,6 +302,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         (exists, offer) = fetchOffer(_offerId);
     }
 
+    /**
+     * Get an Exchange by ID
+     */
     function getExchange(uint256 _exchangeId)
         public
         view
@@ -302,6 +315,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
     /** Internal */
 
+    /**
+     * Fetch an offer and return if it exists
+     */
     function fetchOffer(uint256 _offerId)
         internal
         view
@@ -311,6 +327,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         exists = (offer.id > 0 && _offerId == offer.id);
     }
 
+    /**
+     * Get an offer an revert if doesn't exist or is voided
+     */
     function getValidOffer(uint256 _offerId)
         internal
         view
@@ -322,6 +341,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(!offer.voided, "Offer is void");
     }
 
+    /**
+     * Get an exchange and return if it exists
+     */
     function fetchExchange(uint256 _exchangeId)
         internal
         view
@@ -331,22 +353,44 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         exists = (exchange.id > 0 && _exchangeId == exchange.id);
     }
 
-    function getSellerFromExchange(uint256 _exchangeId)
+    /**
+     * Fetch and exchange.  Revert if it doesn't exist or
+     * not in the committed state.
+     */
+    function fetchCommittedExchange(uint256 _exchangeId)
         internal
         view
-        returns (address seller)
+        returns (BionetTypes.Exchange storage exchange)
     {
-        BionetTypes.Exchange memory exchange = exchanges[_exchangeId];
+        exchange = exchanges[_exchangeId];
         bool exists = (exchange.id > 0 && _exchangeId == exchange.id);
-        require(exists, "Exchange does not exist");
-        BionetTypes.Offer memory offer = offers[exchange.offerId];
-        seller = offer.seller;
+        require(exists, EXCHANGE_404);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Committed,
+            EXPECTED_COMMIT_STATE
+        );
     }
 
-    function isValidExchangeState(
-        BionetTypes.ExchangeState _currentState,
-        BionetTypes.ExchangeState _expectedState
-    ) internal pure returns (bool) {
-        return _currentState == _expectedState;
+    /**
+     * Burns voucher and release funds based on the exchange state
+     */
+    function finalizeCommittment(
+        uint256 _exchangeId,
+        address _seller,
+        address _buyer,
+        uint256 _price,
+        BionetTypes.ExchangeState _state
+    ) internal {
+        // burn the voucher
+        IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
+
+        // release funds based on the state
+        IBionetFunds(fundsAddress).releaseFunds(
+            _exchangeId,
+            _seller,
+            _buyer,
+            _price,
+            _state
+        );
     }
 }

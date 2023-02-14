@@ -6,10 +6,15 @@ import "../BionetTypes.sol";
 import {CANCEL_REVOKE_FEE, PROTOCOL_FEE} from "../BionetConstants.sol";
 
 /**
- * Protocol fees and payoffs.
+ * @dev Helper function for protocol fees and costs.
  */
 library FundsLib {
-    // Calculate the fee required
+    /**
+     * @dev Calculage a fee (% of price) for a given price and basis point.
+     *
+     * A way of calculating a percentage in Solidity.  For example,
+     * 200 basis points is 2%. Current percentage are in BionetConstants
+     */
     function calculateFee(uint256 _price, uint256 _basisPoint)
         internal
         pure
@@ -18,17 +23,20 @@ library FundsLib {
         return (_price * _basisPoint) / 10_000;
     }
 
-    // Determine the msg.value required by the caller for a given state
+    /**
+     * @dev Calculate the cost needed for a given state.  This is
+     * currently used to calculate penalty fees the caller is required
+     * to submit (mg.value) with a revoke or cancel.
+     */
     function calculateCost(uint256 _price, BionetTypes.ExchangeState _state)
         internal
         pure
         returns (uint256 amount)
     {
-        if (_state == BionetTypes.ExchangeState.Canceled) {
-            // buyer pays
-            amount = calculateFee(_price, CANCEL_REVOKE_FEE);
-        } else if (_state == BionetTypes.ExchangeState.Revoked) {
-            // seller pays
+        if (
+            _state == BionetTypes.ExchangeState.Canceled ||
+            _state == BionetTypes.ExchangeState.Revoked
+        ) {
             amount = calculateFee(_price, CANCEL_REVOKE_FEE);
         }
     }

@@ -7,6 +7,12 @@ import "./interfaces/IBionetVoucher.sol";
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "openzeppelin/token/ERC721/extensions/ERC721Burnable.sol";
 
+/**
+ * Issues/Burns Vouchers (erc721) for buyers. Only callable
+ * from exchange.
+ *
+ * TODO: Should the voucher be non-transferable once minted to a buyer?
+ */
 contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
     address routerAddress;
     address exchangeAddress;
@@ -16,6 +22,11 @@ contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
         _;
     }
 
+    /**
+     * @dev Set the contract addresses.
+     *
+     * TODO: Do we need router address?
+     */
     constructor(address _router, address _exchange)
         ERC721("BionetVoucher", "BNTV")
     {
@@ -23,14 +34,19 @@ contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
         exchangeAddress = _exchange;
     }
 
+    /**
+     * @dev See {IBionetVoucher}
+     */
     function issueVoucher(address _to, uint256 _exchangeId)
         public
         onlyExchange
     {
-        // Record in store???
         _mint(_to, _exchangeId);
     }
 
+    /**
+     * @dev See {IBionetVoucher}
+     */
     function burnVoucher(uint256 _exchangeId) public onlyExchange {
         _burn(_exchangeId);
     }

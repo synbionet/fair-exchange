@@ -8,10 +8,16 @@ import "./interfaces/IBionetFunds.sol";
 
 import "openzeppelin/utils/Address.sol";
 
+/**
+ * Manage funds for the protocol.  Maintains escrow and protocol fees.
+ * Uses Eth.
+ */
 contract BionetFunds is IBionetFunds {
     using Address for address payable;
 
+    // Address of the router
     address routerAddress;
+    // Address of the exchange
     address exchangeAddress;
 
     // Escrow balance keyed by buyer/seller address
@@ -29,24 +35,41 @@ contract BionetFunds is IBionetFunds {
         _;
     }
 
+    /**
+     * @dev Set addresses needed
+     */
     constructor(address _router, address _exchange) {
         routerAddress = _router;
         exchangeAddress = _exchange;
     }
 
+    /**
+     * @dev See {IBionetFunds}
+     *
+     * Decrease escrow balance and send 'amount' to the 'account'
+     *
+     * Will revert if:
+     *  - amount requested is > escrow balance
+     *
+     * Emits Event
+     */
     function withdraw(address _account, uint256 _amount) external onlyRouter {
-        // TODO:  Talk to Exchange to determine how much the caller can wthdraw
-
-        require(_amount > 0, MUST_BE_GT_ZERO);
-        uint256 bal = getEscrowBalance(_account);
-        require(bal >= _amount, INSUFFICIENT_FUNDS);
-
         decreaseEscrow(_account, _amount);
         payable(_account).sendValue(_amount);
 
         emit EscrowWithdraw(_account, _amount);
     }
 
+    /**
+     * @dev See {IBionetFunds}
+     *
+     * Called by buyer to escrow funds
+     *
+     * Will revert if:
+     *  - amount requested msg.value < price
+     *
+     * Emits Event
+     */
     function encumberFunds(
         address _buyer,
         uint256 _price,
@@ -57,6 +80,17 @@ contract BionetFunds is IBionetFunds {
         emit EscrowEncumbered(_buyer, _offerId, _price);
     }
 
+    /**
+     * @dev See {IBionetFunds}
+     *
+     * Releases funds to parties based in the current exchange state. Calculates
+     * fees and adjusts escrow as needed.
+     *
+     * Currently only releases funds for 3 states: Cancel, Revoke, Complete.
+     * More will be added.
+     *
+     * Emits Events
+     */
     function releaseFunds(
         uint256 _exchangeId,
         address _seller,
@@ -99,6 +133,9 @@ contract BionetFunds is IBionetFunds {
         }
     }
 
+    /**
+     * @dev See {IBionetFunds}
+     */
     function getEscrowBalance(address _account)
         public
         view
@@ -107,6 +144,9 @@ contract BionetFunds is IBionetFunds {
         bal = escrow[_account];
     }
 
+    /**
+     * @dev See {IBionetFunds}
+     */
     function getProtocolBalance() public view returns (uint256 bal) {
         bal = protocolBalance;
     }
@@ -114,17 +154,17 @@ contract BionetFunds is IBionetFunds {
     /***  Internal ***/
 
     function increaseEscrow(address account, uint256 _amount) internal {
-        require(_amount > 0, VALUE_GT_ZERO);
         uint256 bal = escrow[account];
-        escrow[account] = bal + _amount;
+        if (_amount > 0) escrow[account] = bal + _amount;
     }
 
     function decreaseEscrow(address account, uint256 _amount) internal {
-        require(_amount > 0, VALUE_GT_ZERO);
-        uint256 bal = escrow[account];
-        require(bal >= _amount, INSUFFICIENT_FUNDS);
-        unchecked {
-            escrow[account] = bal - _amount;
+        if (_amount > 0) {
+            uint256 bal = escrow[account];
+            require(bal >= _amount, INSUFFICIENT_FUNDS);
+            unchecked {
+                escrow[account] = bal - _amount;
+            }
         }
     }
 }
