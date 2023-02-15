@@ -6,6 +6,8 @@ import "../src/BionetConstants.sol";
 import "../src/libs/FundsLib.sol";
 import "./helpers/BaseBionetTest.sol";
 
+import "openzeppelin/token/ERC1155/IERC1155.sol";
+
 contract RedeemCompleteTest is BaseBionetTest {
     // NOTE: seller is from Base
     address payable buyer = payable(address(0x555));
@@ -144,5 +146,41 @@ contract RedeemCompleteTest is BaseBionetTest {
         vm.expectRevert("Not authorized to finalize the exchange");
         router.finalize(exchangeId);
         vm.stopPrank();
+    }
+
+    function testSellerDisapprovesExchange() public {
+        // what if the seller (after commit) no longer allows
+        // the exchange to xfer IP NFTs on behalf of the seller?
+
+        // start redeem setup
+        vm.startPrank(seller);
+        uint256 offerId = createOffer(seller, price, assetToken, assetTokenId);
+        vm.stopPrank();
+
+        vm.startPrank(buyer);
+        uint256 exchangeId = makeCommit(price, offerId);
+        vm.stopPrank();
+
+        // Buyer has a voucher before redeem
+        (, BionetTypes.Exchange memory exc) = exchange.getExchange(exchangeId);
+        assertEq(voucher.balanceOf(exc.buyer), 1);
+
+        vm.startPrank(buyer);
+        router.redeem(exchangeId);
+        vm.stopPrank();
+        // end redeem setup
+
+        vm.startPrank(seller);
+        // Before complete seller disapproves the exchange
+        IERC1155(address(ipAsset)).setApprovalForAll(address(exchange), false);
+        vm.stopPrank();
+
+        vm.startPrank(buyer);
+        vm.expectRevert("ERC1155: caller is not token owner or approved");
+        router.finalize(exchangeId);
+        vm.stopPrank();
+
+        // Seller doesn't get paid
+        assertTrue(funds.getEscrowBalance(seller) == 0);
     }
 }
