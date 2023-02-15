@@ -43,7 +43,9 @@ contract BaseBionetTest is Test {
         vm.deal(seller, WALLET_FUNDING);
         vm.startPrank(seller);
         // Deploy and IP Asset the seller will offer
+        // Approve the exchange to xfer
         ipAsset = new MockAsset();
+        ipAsset.setApprovalForAll(ea, true);
         vm.stopPrank();
     }
 

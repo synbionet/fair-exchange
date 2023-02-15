@@ -55,6 +55,12 @@ contract RedeemCompleteTest is BaseBionetTest {
         assertTrue(exc1.state == BionetTypes.ExchangeState.Completed);
         assertTrue(exc1.finalizedDate == block.timestamp);
 
+        (, BionetTypes.Offer memory o) = exchange.getOffer(offerId);
+
+        // Check asset is transfered
+        uint256 ab = ipAsset.balanceOf(exc1.buyer, o.assetTokenId);
+        assertTrue(ab == o.quantityAvailable);
+
         // check balances
         uint256 bba = funds.getEscrowBalance(buyer);
         uint256 sba = funds.getEscrowBalance(seller);

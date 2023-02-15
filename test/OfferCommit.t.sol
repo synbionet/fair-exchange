@@ -31,12 +31,12 @@ contract OfferCommitTest is BaseBionetTest {
 
         // Fail: Try to use an asset I don't own
         // ... assetToken is owned by seller NOT 'this'
-        vm.expectRevert("Cannot sell more than you own");
+        vm.expectRevert("Don't own enough IP tokens to offer");
         createOffer(address(this), price, assetToken, assetTokenId);
 
         // Fail: use a tokenId I don't own
         vm.startPrank(seller);
-        vm.expectRevert("Cannot sell more than you own");
+        vm.expectRevert("Don't own enough IP tokens to offer");
         createOffer(seller, price, assetToken, 100);
         vm.stopPrank();
 

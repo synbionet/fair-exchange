@@ -10,6 +10,7 @@ import "./interfaces/IBionetVoucher.sol";
 import "./interfaces/IBionetExchange.sol";
 
 import "openzeppelin/utils/Address.sol";
+import "openzeppelin/token/ERC1155/IERC1155.sol";
 import "openzeppelin/security/ReentrancyGuard.sol";
 
 /**
@@ -318,7 +319,16 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.state = BionetTypes.ExchangeState.Completed;
             exchange.finalizedDate = block.timestamp;
 
-            // TODO: Transfer IP NFT!
+            // IF the seller changed the approval for the exchange
+            // to 'false', this will revert.  Which means the seller doesn't
+            // get paid till they approve the exchange for xfer.
+            IERC1155(offer.assetToken).safeTransferFrom(
+                offer.seller,
+                exchange.buyer,
+                offer.assetTokenId,
+                offer.quantityAvailable,
+                ""
+            );
 
             // release funds
             IBionetFunds(fundsAddress).releaseFunds(
