@@ -34,9 +34,9 @@ contract BionetRouter is Ownable, IBionetRouter {
     }
 
     /**
-     * @dev Sets the required addresses of the funds and exchange contracts
+     * @dev Called after default contructor to set needed addresses
      */
-    constructor(address _funds, address _exchange) {
+    function initialize(address _funds, address _exchange) external {
         fundsAddress = _funds;
         exchangeAddress = _exchange;
     }

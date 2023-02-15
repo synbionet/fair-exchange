@@ -39,13 +39,13 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     }
 
     /**
-     * @dev Set the required addresses
+     * @dev Called after default contructor to set needed addresses
      */
-    constructor(
+    function initialize(
         address _router,
         address _funds,
         address _voucher
-    ) {
+    ) external {
         routerAddress = _router;
         fundsAddress = _funds;
         voucherAddress = _voucher;

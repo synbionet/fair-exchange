@@ -23,29 +23,28 @@ contract BaseBionetTest is Test {
     uint256 public constant WALLET_FUNDING = 10 ether;
 
     function setUp() public virtual {
-        // pre-computed addresses
-        uint256 acctNonce = vm.getNonce(address(this));
-        // router
-        address ra = computeCreateAddress(address(this), acctNonce);
-        // funds
-        address fa = computeCreateAddress(address(this), acctNonce + 1);
-        // voucher
-        address va = computeCreateAddress(address(this), acctNonce + 2);
-        // exchange
-        address ea = computeCreateAddress(address(this), acctNonce + 3);
+        router = new BionetRouter();
+        funds = new BionetFunds();
+        voucher = new BionetVoucher();
+        exchange = new BionetExchange();
 
-        // Note: deploy in the same order as the pre-computed addresses
-        router = new BionetRouter(fa, ea);
-        funds = new BionetFunds(ra, ea);
-        voucher = new BionetVoucher(ra, ea);
-        exchange = new BionetExchange(ra, fa, va);
+        // Addresses
+        address rA = address(router);
+        address fA = address(funds);
+        address vA = address(voucher);
+        address eA = address(exchange);
+
+        router.initialize(fA, eA);
+        funds.initialize(rA, eA);
+        voucher.initialize(eA);
+        exchange.initialize(rA, fA, vA);
 
         vm.deal(seller, WALLET_FUNDING);
         vm.startPrank(seller);
         // Deploy and IP Asset the seller will offer
         // Approve the exchange to xfer
         ipAsset = new MockAsset();
-        ipAsset.setApprovalForAll(ea, true);
+        ipAsset.setApprovalForAll(eA, true);
         vm.stopPrank();
     }
 

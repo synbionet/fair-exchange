@@ -13,6 +13,11 @@ import "openzeppelin/token/ERC721/IERC721.sol";
  */
 interface IBionetVoucher is IERC721 {
     /**
+     * @dev initialize with needed addresses
+     */
+    function initialize(address _exchange) external;
+
+    /**
      * @dev Issue a voucher 'to' for the given exchange
      */
     function issueVoucher(address _to, uint256 _exchangeId) external;

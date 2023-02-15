@@ -10,6 +10,11 @@ import "../BionetTypes.sol";
  */
 interface IBionetRouter {
     /**
+     * @dev initialize with needed addresses
+     */
+    function initialize(address _funds, address _exchange) external;
+
+    /**
      * @dev Create a new offer.
      *
      * Called by the seller.

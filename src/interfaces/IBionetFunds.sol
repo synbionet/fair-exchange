@@ -18,6 +18,11 @@ interface IBionetFunds {
     event FeeCollected(uint256 amount);
 
     /**
+     * @dev initialize with needed addresses
+     */
+    function initialize(address _router, address _exchange) external;
+
+    /**
      * @dev Withdraw 'amount' from escrow
      */
     function withdraw(address _account) external;

@@ -14,7 +14,7 @@ import "openzeppelin/token/ERC721/extensions/ERC721Burnable.sol";
  * TODO: Should the voucher be non-transferable once minted to a buyer?
  */
 contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
-    address routerAddress;
+    //address routerAddress;
     address exchangeAddress;
 
     modifier onlyExchange() {
@@ -28,10 +28,12 @@ contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
      * NOTE: Doesn't need routerAddress
      * TODO: Do we need router address?
      */
-    constructor(address _router, address _exchange)
-        ERC721("BionetVoucher", "BNTV")
-    {
-        routerAddress = _router;
+    constructor() ERC721("BionetVoucher", "BNTV") {}
+
+    /**
+     * @dev Called after default contructor to set needed addresses
+     */
+    function initialize(address _exchange) external {
         exchangeAddress = _exchange;
     }
 

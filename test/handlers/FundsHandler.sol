@@ -10,11 +10,21 @@ import {BionetFunds} from "../../src/BionetFunds.sol";
 
 /**
  * Wrapper for invariant testing BionetFunds
+ * Invariants:
+ *  - total ether balance == total escrowed + total fees;
+ *  - escrow == sum of all accounts
+ *  - releaseable funds <= all escrowed
  */
 contract FundsHandler is CommonBase, StdCheats, StdUtils {
-    //BionetFunds funds;
+    BionetFunds funds;
 
-    constructor() {
-        //funds = new BionetFunds(address(this), address(this));
+    constructor(BionetFunds _funds) {
+        funds = _funds;
+        funds.initialize(address(this), address(this));
+        deal(address(this), 10 ether);
+    }
+
+    function deposit(uint256 amount) public {
+        funds.deposit{value: amount}(msg.sender);
     }
 }

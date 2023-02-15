@@ -12,10 +12,6 @@ import "openzeppelin/utils/Address.sol";
  * Manage funds for the protocol.  Maintains escrow and protocol fees.
  * Uses ether vs token (for now).
  *
- * Invariants:
- *  - total ether balance == total escrowed + total fees;
- *  - escrow == sum of all accounts
- *  - releaseable funds <= all escrowed
  */
 contract BionetFunds is IBionetFunds {
     using Address for address payable;
@@ -42,9 +38,9 @@ contract BionetFunds is IBionetFunds {
     }
 
     /**
-     * @dev Set addresses needed
+     * @dev Called after default contructor to set needed addresses
      */
-    constructor(address _router, address _exchange) {
+    function initialize(address _router, address _exchange) external {
         routerAddress = _router;
         exchangeAddress = _exchange;
     }

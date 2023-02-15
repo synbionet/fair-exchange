@@ -77,6 +77,15 @@ interface IBionetExchange {
     );
 
     /**
+     * @dev initialize with needed addresses
+     */
+    function initialize(
+        address _router,
+        address _funds,
+        address _voucher
+    ) external;
+
+    /**
      * @dev Create an Offer
      */
     function createOffer(BionetTypes.Offer memory _offer)
