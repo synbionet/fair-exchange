@@ -65,11 +65,11 @@ interface IBionetRouter {
     function finalize(uint256 _exchangeId) external;
 
     /**
-     * @dev Withdraw funds held in escrow.
+     * @dev Withdraw funds that have been released from escrow
      *
      * Can be called by buyer or seller
      */
-    function withdraw(uint256 _amount) external;
+    function withdraw() external;
 
     /**
      * @dev Get the escrow balance of a given account

@@ -81,17 +81,17 @@ contract CommitCancelTest is BaseBionetTest {
         vm.stopPrank();
 
         // Now, buyer/seller decide to withdraw funds
-        uint256 buyerEscrowBal = funds.getEscrowBalance(buyer1);
+        //uint256 buyerEscrowBal = funds.getEscrowBalance(buyer1);
         uint256 buyerEthBalBefore = buyer1.balance;
-        uint256 sellerEscrowBal = funds.getEscrowBalance(seller);
+        //uint256 sellerEscrowBal = funds.getEscrowBalance(seller);
         uint256 sellerEthBalBefore = seller.balance;
 
         vm.startPrank(buyer1);
-        router.withdraw(buyerEscrowBal);
+        router.withdraw();
         vm.stopPrank();
 
         vm.startPrank(seller);
-        router.withdraw(sellerEscrowBal);
+        router.withdraw();
         vm.stopPrank();
 
         // Seller is paid a fee on cancel of buyer

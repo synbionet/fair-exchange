@@ -116,11 +116,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         exchange.state = BionetTypes.ExchangeState.Committed;
 
         // escrow the funds
-        IBionetFunds(fundsAddress).encumberFunds{value: msg.value}(
-            _buyer,
-            msg.value,
-            _offerId
-        );
+        IBionetFunds(fundsAddress).deposit{value: msg.value}(_buyer);
 
         // issue token to buyer
         IBionetVoucher(voucherAddress).issueVoucher(_buyer, eid);
@@ -332,7 +328,6 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
             // release funds
             IBionetFunds(fundsAddress).releaseFunds(
-                _exchangeId,
                 offer.seller,
                 exchange.buyer,
                 offer.price,
@@ -461,7 +456,6 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
         // release funds based on the state
         IBionetFunds(fundsAddress).releaseFunds(
-            _exchangeId,
             _seller,
             _buyer,
             _price,

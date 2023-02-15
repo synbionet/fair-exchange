@@ -10,7 +10,12 @@ import "openzeppelin/utils/Address.sol";
 
 /**
  * Manage funds for the protocol.  Maintains escrow and protocol fees.
- * Uses Eth.
+ * Uses ether vs token (for now).
+ *
+ * Invariants:
+ *  - total ether balance == total escrowed + total fees;
+ *  - escrow == sum of all accounts
+ *  - releaseable funds <= all escrowed
  */
 contract BionetFunds is IBionetFunds {
     using Address for address payable;
@@ -19,11 +24,12 @@ contract BionetFunds is IBionetFunds {
     address routerAddress;
     // Address of the exchange
     address exchangeAddress;
-
-    // Escrow balance keyed by buyer/seller address
-    mapping(address => uint256) escrow;
-    // Balance of protocol fees collected
+    // Balance of fees collected
     uint256 protocolBalance;
+    // Escrow balance keyed by address
+    mapping(address => uint256) escrow;
+    // How much escrow has been released (can be withdrawn)
+    mapping(address => uint256) availableToWithdraw;
 
     modifier onlyRouter() {
         require(msg.sender == routerAddress, UNAUTHORIZED_ACCESS);
@@ -43,6 +49,11 @@ contract BionetFunds is IBionetFunds {
         exchangeAddress = _exchange;
     }
 
+    function deposit(address _account) external payable onlyExchange {
+        increaseEscrow(_account, msg.value);
+        emit DepositFunds(_account, msg.value);
+    }
+
     /**
      * @dev See {IBionetFunds}
      *
@@ -53,31 +64,13 @@ contract BionetFunds is IBionetFunds {
      *
      * Emits Event
      */
-    function withdraw(address _account, uint256 _amount) external onlyRouter {
-        decreaseEscrow(_account, _amount);
-        payable(_account).sendValue(_amount);
-
-        emit EscrowWithdraw(_account, _amount);
-    }
-
-    /**
-     * @dev See {IBionetFunds}
-     *
-     * Called by buyer to escrow funds
-     *
-     * Will revert if:
-     *  - amount requested msg.value < price
-     *
-     * Emits Event
-     */
-    function encumberFunds(
-        address _buyer,
-        uint256 _price,
-        uint256 _offerId
-    ) external payable onlyExchange {
-        require(msg.value >= _price, INSUFFICIENT_FUNDS);
-        increaseEscrow(_buyer, msg.value);
-        emit EscrowEncumbered(_buyer, _offerId, _price);
+    function withdraw(address _account) external onlyRouter {
+        uint256 amount = availableToWithdraw[_account];
+        if (amount > 0) {
+            decreaseEscrow(_account, amount);
+            payable(_account).sendValue(amount);
+            emit WithdrawFunds(_account, amount);
+        }
     }
 
     /**
@@ -92,7 +85,6 @@ contract BionetFunds is IBionetFunds {
      * Emits Events
      */
     function releaseFunds(
-        uint256 _exchangeId,
         address _seller,
         address _buyer,
         uint256 _price,
@@ -100,14 +92,20 @@ contract BionetFunds is IBionetFunds {
     ) external onlyExchange {
         if (_state == BionetTypes.ExchangeState.Canceled) {
             // Canceled by buyer or protocol timeout
+
+            // Calculate fee
             uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
-            // increase sellers escrow by 'fee'
+            // Increase sellers escrow by 'fee'
             increaseEscrow(_seller, fee);
-            // decrease buyers escrow by 'fee'
+            // Decrease buyers escrow by 'fee'
             decreaseEscrow(_buyer, fee);
 
-            emit FundsReleased(_exchangeId, _seller, fee);
-            emit FundsReleased(_exchangeId, _buyer, _price - fee);
+            // Update amount available to withdraw
+            availableToWithdraw[_seller] += fee;
+            availableToWithdraw[_buyer] += (_price - fee);
+
+            emit ReleaseFunds(_seller, fee);
+            emit ReleaseFunds(_buyer, _price - fee);
         }
 
         if (_state == BionetTypes.ExchangeState.Revoked) {
@@ -115,22 +113,38 @@ contract BionetFunds is IBionetFunds {
             uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
             // increase buyers escrow by 'fee'
             increaseEscrow(_buyer, fee);
-            emit FundsReleased(_exchangeId, _buyer, _price + fee);
+            availableToWithdraw[_buyer] += (_price + fee);
+
+            emit ReleaseFunds(_buyer, _price + fee);
         }
 
         if (_state == BionetTypes.ExchangeState.Completed) {
             // all good
             uint256 fee = FundsLib.calculateFee(_price, PROTOCOL_FEE);
             // increase protocol by 'fee'
-            protocolBalance = protocolBalance + fee;
+            protocolBalance += fee;
             // decrease buyers escrow by 'price'
             decreaseEscrow(_buyer, _price);
+
             // increase sellers escrow by 'price - fee'
             increaseEscrow(_seller, _price - fee);
+            availableToWithdraw[_seller] += (_price - fee);
 
-            emit FundsReleased(_exchangeId, _seller, _price - fee);
-            emit ProtocolFeeCollected(_exchangeId, fee);
+            emit ReleaseFunds(_seller, _price - fee);
+            emit FeeCollected(fee);
         }
+    }
+
+    // Catch ether accidently sent to contract
+    fallback() external payable {
+        // goes to protocol fee
+        protocolBalance += msg.value;
+    }
+
+    // Receive ether sent to the contract's address
+    receive() external payable {
+        // goes to protocol fee
+        protocolBalance += msg.value;
     }
 
     /**
@@ -154,17 +168,11 @@ contract BionetFunds is IBionetFunds {
     /***  Internal ***/
 
     function increaseEscrow(address account, uint256 _amount) internal {
-        uint256 bal = escrow[account];
-        if (_amount > 0) escrow[account] = bal + _amount;
+        escrow[account] += _amount;
     }
 
     function decreaseEscrow(address account, uint256 _amount) internal {
-        if (_amount > 0) {
-            uint256 bal = escrow[account];
-            require(bal >= _amount, INSUFFICIENT_FUNDS);
-            unchecked {
-                escrow[account] = bal - _amount;
-            }
-        }
+        require(escrow[account] >= _amount, INSUFFICIENT_FUNDS);
+        escrow[account] -= _amount;
     }
 }

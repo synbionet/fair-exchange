@@ -6,59 +6,31 @@ import "../BionetTypes.sol";
 /**
  * @dev Manages funds for the protocol
  *
- * For now we only use Eth for simplicity.  We'll move to tokens in the future.
+ * For now we use Eth for simplicity.  We'll move to tokens in the future.
  *
  * Escrow is tracked by address.
  * Protocol balance is tracked and can only be withdrawn by the router owner (TODO)
  */
 interface IBionetFunds {
-    //event EscrowDeposit(address indexed account, uint256 amount);
-    /**
-     * @dev Emitted when the 'account' is withdraw 'amount' from escrow
-     */
-    event EscrowWithdraw(address indexed account, uint256 amount);
-
-    /**
-     * @dev Emitted when the 'buyer' has escrowed the 'amount' for an offer
-     */
-    event EscrowEncumbered(
-        address indexed buyer,
-        uint256 indexed offerid,
-        uint256 amount
-    );
-    /**
-     * @dev Emitted when the exchange is release 'amount' of funds to the 'receiver'
-     */
-    event FundsReleased(
-        uint256 indexed _exchangeId,
-        address indexed receiver,
-        uint256 amount
-    );
-
-    /**
-     * @dev Emitted when the protocol has collect 'amount' for an exchange
-     */
-    event ProtocolFeeCollected(uint256 indexed _exchangeId, uint256 amount);
+    event DepositFunds(address indexed account, uint256 amount);
+    event WithdrawFunds(address indexed account, uint256 amount);
+    event ReleaseFunds(address indexed account, uint256 amount);
+    event FeeCollected(uint256 amount);
 
     /**
      * @dev Withdraw 'amount' from escrow
      */
-    function withdraw(address _account, uint256 _amount) external;
+    function withdraw(address _account) external;
 
     /**
-     * @dev Commit funds to escrow for a new exchange
+     * @dev Deposit to escrow
      */
-    function encumberFunds(
-        address _buyer,
-        uint256 _price,
-        uint256 _offerId
-    ) external payable;
+    function deposit(address _account) external payable;
 
     /**
      * @dev Release funds to parties
      */
     function releaseFunds(
-        uint256 _exchangeId,
         address _seller,
         address _buyer,
         uint256 _price,

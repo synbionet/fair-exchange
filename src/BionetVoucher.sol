@@ -25,6 +25,7 @@ contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
     /**
      * @dev Set the contract addresses.
      *
+     * NOTE: Doesn't need routerAddress
      * TODO: Do we need router address?
      */
     constructor(address _router, address _exchange)

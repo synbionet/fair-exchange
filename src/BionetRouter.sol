@@ -44,8 +44,8 @@ contract BionetRouter is Ownable, IBionetRouter {
     /**
      * @dev See {IBionetRouter}
      */
-    function withdraw(uint256 _amount) external noZeroAddress {
-        IBionetFunds(fundsAddress).withdraw(msg.sender, _amount);
+    function withdraw() external noZeroAddress {
+        IBionetFunds(fundsAddress).withdraw(msg.sender);
     }
 
     /**
