@@ -39,3 +39,4 @@ string constant BAD_VALUE_TRANSFER = "Wrong value transfered";
 // Exchange
 string constant EXCHANGE_404 = "Exchange not found";
 string constant EXPECTED_COMMIT_STATE = "Must be in COMMITTED state";
+string constant EXPECTED_REDEEMED_STATE = "Must be in REDEEMED state";

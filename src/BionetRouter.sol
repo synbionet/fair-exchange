@@ -150,4 +150,11 @@ contract BionetRouter is Ownable, IBionetRouter {
     function redeem(uint256 _exchangeId) external noZeroAddress {
         IBionetExchange(exchangeAddress).redeem(msg.sender, _exchangeId);
     }
+
+    /**
+     * @dev Finalize the exchange. Usually means the buyer is happy.
+     */
+    function finalize(uint256 _exchangeId) external noZeroAddress {
+        IBionetExchange(exchangeAddress).finalize(msg.sender, _exchangeId);
+    }
 }

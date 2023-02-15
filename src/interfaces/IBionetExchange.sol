@@ -68,6 +68,15 @@ interface IBionetExchange {
     );
 
     /**
+     * @dev Emitted when a buyer redeems
+     */
+    event ExchangeCompleted(
+        uint256 indexed offerId,
+        uint256 indexed exchangeId,
+        uint256 timestamp
+    );
+
+    /**
      * @dev Create an Offer
      */
     function createOffer(BionetTypes.Offer memory _offer)
@@ -107,6 +116,11 @@ interface IBionetExchange {
      * @dev Redeem a voucher
      */
     function redeem(address _buyer, uint256 exchangeId) external;
+
+    /**
+     * @dev Finalize an exchange
+     */
+    function finalize(address _buyer, uint256 exchangeId) external;
 
     /**
      * @dev Return an Offer

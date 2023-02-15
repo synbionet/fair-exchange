@@ -49,11 +49,17 @@ interface IBionetRouter {
     function revoke(uint256 _exchangeId) external payable;
 
     /**
-     * Redeem a voucher representing a committment to a purchase
+     * @dev Redeem a voucher representing a committment to a purchase
      *
      * Called by the buyer
      */
     function redeem(uint256 _exchangeId) external;
+
+    /**
+     * @dev Called by buyer to complete an exchange. This
+     * marks the exchanged as 'completed' and release funds to all parties
+     */
+    function finalize(uint256 _exchangeId) external;
 
     /**
      * @dev Withdraw funds held in escrow.

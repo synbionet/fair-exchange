@@ -288,6 +288,51 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         }
     }
 
+    /**
+     * @dev Finalize an exchange.
+     *
+     * This is an important step in the process. It releases funds, and transfers
+     * the IP NFT.  Exchange must be in the 'redeemed' state
+     *
+     * Possible scenarios:
+     * 1. buyer calls to close -> all good, [completed]
+     * 2. dispute timer expires -> [completed]
+     *
+     * Therefore any one can call finalize under the following conditions:
+     * - The buyer is the caller, OR
+     * - The dispute timer has expired
+     *
+     * In either case, the exchange will be closed.
+     */
+    function finalize(address _buyer, uint256 _exchangeId) external onlyRouter {
+        BionetTypes.Exchange storage exchange = fetchRedeemedExchange(
+            _exchangeId
+        );
+        bool disputeExpired = block.timestamp > exchange.disputeBy;
+
+        if (_buyer == exchange.buyer || disputeExpired == true) {
+            // wrap it up...
+            BionetTypes.Offer memory offer = offers[exchange.offerId];
+            exchange.state = BionetTypes.ExchangeState.Completed;
+            exchange.finalizedDate = block.timestamp;
+
+            // TODO: Transfer IP NFT!
+
+            // release funds
+            IBionetFunds(fundsAddress).releaseFunds(
+                _exchangeId,
+                offer.seller,
+                exchange.buyer,
+                offer.price,
+                BionetTypes.ExchangeState.Completed
+            );
+
+            emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
+        } else {
+            revert("Not authorized to finalize the exchange");
+        }
+    }
+
     /** Views **/
 
     /**
@@ -354,7 +399,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     }
 
     /**
-     * Fetch and exchange.  Revert if it doesn't exist or
+     * Fetch an exchange.  Revert if it doesn't exist or
      * not in the committed state.
      */
     function fetchCommittedExchange(uint256 _exchangeId)
@@ -368,6 +413,24 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(
             exchange.state == BionetTypes.ExchangeState.Committed,
             EXPECTED_COMMIT_STATE
+        );
+    }
+
+    /**
+     * Fetch an exchange.  Revert if it doesn't exist or
+     * not in the redeemed state.
+     */
+    function fetchRedeemedExchange(uint256 _exchangeId)
+        internal
+        view
+        returns (BionetTypes.Exchange storage exchange)
+    {
+        exchange = exchanges[_exchangeId];
+        bool exists = (exchange.id > 0 && _exchangeId == exchange.id);
+        require(exists, EXCHANGE_404);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Redeemed,
+            EXPECTED_REDEEMED_STATE
         );
     }
 
