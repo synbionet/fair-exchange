@@ -18,7 +18,7 @@ contract BaseBionetTest is Test {
 
     MockAsset ipAsset;
 
-    address seller = address(0x1100);
+    address payable seller = payable(address(0x1100));
 
     uint256 public constant WALLET_FUNDING = 10 ether;
 
