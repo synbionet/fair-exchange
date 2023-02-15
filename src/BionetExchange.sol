@@ -303,13 +303,15 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      * - The dispute timer has expired
      *
      * In either case, the exchange will be closed.
+     *
+     * Emits event on successful close
+     * Will revert if caller is not the buyer and the time has not expired
      */
     function finalize(address _buyer, uint256 _exchangeId) external onlyRouter {
         BionetTypes.Exchange storage exchange = fetchRedeemedExchange(
             _exchangeId
         );
         bool disputeExpired = block.timestamp > exchange.disputeBy;
-
         if (_buyer == exchange.buyer || disputeExpired == true) {
             // wrap it up...
             BionetTypes.Offer memory offer = offers[exchange.offerId];

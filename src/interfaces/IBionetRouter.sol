@@ -56,8 +56,11 @@ interface IBionetRouter {
     function redeem(uint256 _exchangeId) external;
 
     /**
-     * @dev Called by buyer to complete an exchange. This
-     * marks the exchanged as 'completed' and release funds to all parties
+     * @dev Called to complete an exchange.
+     *
+     * This marks the exchanged as 'completed' and release funds to all parties.
+     * - If the dispute timer is not expired, only the buyer can call this.
+     * - If the timer is expired anyone can call this to finalize the exchange.
      */
     function finalize(uint256 _exchangeId) external;
 
