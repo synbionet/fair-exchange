@@ -32,7 +32,7 @@ interface IBionetExchange {
     /**
      * @dev Emitted when a buyer commits to purchase
      */
-    event OfferCommitted(
+    event ExchangeCreated(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed buyer
@@ -41,7 +41,7 @@ interface IBionetExchange {
     /**
      * @dev Emitted when a seller revokes
      */
-    event OfferRevoked(
+    event ExchangeRevoked(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed seller
@@ -50,7 +50,7 @@ interface IBionetExchange {
     /**
      * @dev Emitted when a buyer cancels
      */
-    event OfferCanceled(
+    event ExchangeCanceled(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed buyer,
@@ -60,7 +60,7 @@ interface IBionetExchange {
     /**
      * @dev Emitted when a buyer redeems
      */
-    event OfferRedeemed(
+    event ExchangeRedeemed(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed seller,

@@ -89,7 +89,13 @@ contract BionetRouter is Ownable, IBionetRouter {
             msg.sender,
             _offer.assetTokenId
         );
+        // TODO: Change error = 'you don't own enough'
         require(numTokensOwned >= _offer.quantityAvailable, NOT_OWNER);
+
+        // TODO: Need to approve the exchange to transer this asset/id
+        // on behalf of the user
+        // IERC1155(_offer.assetToken).setApprovalForAll(address(exchangeAddress), true);
+        // See ERC-5216
 
         offerId = IBionetExchange(exchangeAddress).createOffer(_offer);
     }

@@ -125,7 +125,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         IBionetVoucher(voucherAddress).issueVoucher(_buyer, eid);
 
         // emit event
-        emit OfferCommitted(_offerId, eid, _buyer);
+        emit ExchangeCreated(_offerId, eid, _buyer);
         return eid;
     }
 
@@ -161,7 +161,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.state
         );
 
-        emit OfferCanceled(offer.id, exchange.id, exchange.buyer, false);
+        emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, false);
     }
 
     /**
@@ -210,7 +210,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             // reimburse seller the money sent with this transaction
             if (msg.value > 0) payable(_caller).sendValue(msg.value);
 
-            emit OfferCanceled(offer.id, exchange.id, exchange.buyer, true);
+            emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, true);
         } else {
             // do the revoke. Seller pays the penalty
             uint256 cost = FundsLib.calculateCost(
@@ -230,7 +230,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
                 exchange.state
             );
 
-            emit OfferRevoked(offer.id, _exchangeId, _caller);
+            emit ExchangeRevoked(offer.id, _exchangeId, _caller);
         }
     }
 
@@ -269,7 +269,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
                 exchange.state
             );
 
-            emit OfferCanceled(offer.id, exchange.id, exchange.buyer, true);
+            emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, true);
         } else {
             // Move to the redeemed state
             exchange.state = BionetTypes.ExchangeState.Redeemed;
@@ -279,7 +279,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             // burn the voucher
             IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
 
-            emit OfferRedeemed(
+            emit ExchangeRedeemed(
                 offer.id,
                 exchange.id,
                 offer.seller,
