@@ -1,8 +1,11 @@
-.PHONY: artifacts, deploy
+.PHONY: artifacts, deploy, clean-artifacts
+
+
+clean-artifacts:
+	rm -rf artifacts
 
 artifacts: 
 	mkdir -p artifacts
-	cp ./out/BionetFunds.sol/BionetFunds.json artifacts/BionetFunds.json
 	cp ./out/BionetRouter.sol/BionetRouter.json artifacts/BionetRouter.json
 	cp ./out/BionetVoucher.sol/BionetVoucher.json artifacts/BionetVoucher.json
 	cp ./out/BionetExchange.sol/BionetExchange.json artifacts/BionetExchange.json
