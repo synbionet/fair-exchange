@@ -27,14 +27,12 @@ contract BionetTestBase is Test {
 
         // Addresses
         address rA = address(router);
-        // NOTE: faking Funds until refactor is done
-        address fA = address(0x5555);
         address vA = address(voucher);
         address eA = address(exchange);
 
         router.initialize(eA);
         voucher.initialize(eA);
-        exchange.initialize(rA, fA, vA);
+        exchange.initialize(rA, vA);
 
         vm.deal(seller, WALLET_FUNDING);
         vm.deal(buyer, WALLET_FUNDING);

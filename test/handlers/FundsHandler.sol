@@ -6,8 +6,6 @@ import {CommonBase} from "forge-std/Base.sol";
 import {StdUtils} from "forge-std/StdUtils.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
-import {BionetFunds} from "../../src/BionetFunds.sol";
-
 /**
  * Wrapper for invariant testing BionetFunds
  * Invariants:
@@ -16,15 +14,11 @@ import {BionetFunds} from "../../src/BionetFunds.sol";
  *  - releaseable funds <= all escrowed
  */
 contract FundsHandler is CommonBase, StdCheats, StdUtils {
-    BionetFunds funds;
-
-    constructor(BionetFunds _funds) {
-        funds = _funds;
-        funds.initialize(address(this), address(this));
+    constructor() {
         deal(address(this), 10 ether);
     }
 
     function deposit(uint256 amount) public {
-        funds.deposit{value: amount}(msg.sender);
+        //funds.deposit{value: amount}(msg.sender);
     }
 }

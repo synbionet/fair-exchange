@@ -5,7 +5,6 @@ import "./BionetTypes.sol";
 import "./BionetConstants.sol";
 
 import {FundsLib} from "./libs/FundsLib.sol";
-import "./interfaces/IBionetFunds.sol";
 import "./interfaces/IBionetRouter.sol";
 import "./interfaces/IBionetVoucher.sol";
 import "./interfaces/IBionetExchange.sol";
@@ -46,7 +45,7 @@ contract BionetRouter is Ownable, IBionetRouter {
      * @dev See {IBionetRouter}
      */
     function withdraw() external noZeroAddress {
-        IBionetFunds(exchangeAddress).withdraw(msg.sender);
+        IBionetExchange(exchangeAddress).withdraw(msg.sender);
     }
 
     /**
@@ -58,7 +57,7 @@ contract BionetRouter is Ownable, IBionetRouter {
         noZeroAddress
         returns (uint256 bal)
     {
-        bal = IBionetFunds(exchangeAddress).getEscrowBalance(_account);
+        bal = IBionetExchange(exchangeAddress).getEscrowBalance(_account);
     }
 
     function estimateSellerDeposit(uint256 _price)

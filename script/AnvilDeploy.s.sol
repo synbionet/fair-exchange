@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
-import "../src/BionetFunds.sol";
 import "../src/BionetRouter.sol";
 import "../src/BionetExchange.sol";
 import "../src/BionetVoucher.sol";
@@ -21,26 +20,22 @@ contract AnvilDeployScript is Script {
 
         // Deploy contracts
         BionetRouter router = new BionetRouter();
-        BionetFunds funds = new BionetFunds();
         BionetVoucher voucher = new BionetVoucher();
         BionetExchange exchange = new BionetExchange();
 
         // Addresses
         address rA = address(router);
-        address fA = address(funds);
         address vA = address(voucher);
         address eA = address(exchange);
 
         router.initialize(eA);
-        funds.initialize(rA, eA);
         voucher.initialize(eA);
-        exchange.initialize(rA, fA, vA);
+        exchange.initialize(rA, vA);
 
         vm.stopBroadcast();
 
         console.log("~~ deployed to local Anvil~~");
         console.log("router:   %s", rA);
-        console.log("funds:    %s", fA);
         console.log("voucher:  %s", vA);
         console.log("exchange: %s", eA);
     }

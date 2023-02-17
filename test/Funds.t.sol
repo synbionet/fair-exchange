@@ -5,13 +5,9 @@ import "../src/BionetTypes.sol";
 import {FundsLib} from "../src/libs/FundsLib.sol";
 import {CANCEL_REVOKE_FEE, PROTOCOL_FEE} from "../src/BionetConstants.sol";
 
-import "./helpers/BaseBionetTest.sol";
+import "forge-std/Test.sol";
 
-contract FundsTest is BaseBionetTest {
-    function setUp() public virtual override {
-        super.setUp();
-    }
-
+contract FundsTest is Test {
     function testLib() public {
         uint256 price = 2 ether;
 

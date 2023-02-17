@@ -5,7 +5,6 @@ import "./BionetTypes.sol";
 import "./libs/FundsLib.sol";
 import {ExchangeStorage} from "./libs/ExchangeStorageLib.sol";
 import "./BionetConstants.sol";
-import "./interfaces/IBionetFunds.sol";
 import "./interfaces/IBionetVoucher.sol";
 import "./interfaces/IBionetExchange.sol";
 
@@ -19,8 +18,6 @@ import "openzeppelin/security/ReentrancyGuard.sol";
 contract BionetExchange is IBionetExchange, ReentrancyGuard {
     using Address for address payable;
 
-    // Address of the Funds contract
-    address fundsAddress;
     // Address of the Router
     address routerAddress;
     // Address of the Voucher
@@ -34,13 +31,8 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     /**
      * @dev Called after default contructor to set needed addresses
      */
-    function initialize(
-        address _router,
-        address _funds,
-        address _voucher
-    ) external {
+    function initialize(address _router, address _voucher) external {
         routerAddress = _router;
-        fundsAddress = _funds;
         voucherAddress = _voucher;
     }
 
@@ -357,13 +349,12 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
                 ""
             );
 
-            // release funds
-            // REPLACE
-            IBionetFunds(fundsAddress).releaseFunds(
+            finalizeCommittment(
+                exchange.id,
                 offer.seller,
                 exchange.buyer,
                 offer.price,
-                BionetTypes.ExchangeState.Completed
+                exchange.state
             );
 
             emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
