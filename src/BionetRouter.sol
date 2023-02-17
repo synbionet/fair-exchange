@@ -3,6 +3,8 @@ pragma solidity ^0.8.16;
 
 import "./BionetTypes.sol";
 import "./BionetConstants.sol";
+
+import {FundsLib} from "./libs/FundsLib.sol";
 import "./interfaces/IBionetFunds.sol";
 import "./interfaces/IBionetRouter.sol";
 import "./interfaces/IBionetVoucher.sol";
@@ -22,7 +24,7 @@ import "openzeppelin/utils/introspection/ERC165Checker.sol";
  */
 contract BionetRouter is Ownable, IBionetRouter {
     // Address of BionetFunds
-    address fundsAddress;
+    //address fundsAddress;
     // Address of BionetExchange
     address exchangeAddress;
 
@@ -36,8 +38,7 @@ contract BionetRouter is Ownable, IBionetRouter {
     /**
      * @dev Called after default contructor to set needed addresses
      */
-    function initialize(address _funds, address _exchange) external {
-        fundsAddress = _funds;
+    function initialize(address _exchange) external {
         exchangeAddress = _exchange;
     }
 
@@ -45,7 +46,7 @@ contract BionetRouter is Ownable, IBionetRouter {
      * @dev See {IBionetRouter}
      */
     function withdraw() external noZeroAddress {
-        IBionetFunds(fundsAddress).withdraw(msg.sender);
+        IBionetFunds(exchangeAddress).withdraw(msg.sender);
     }
 
     /**
@@ -57,7 +58,15 @@ contract BionetRouter is Ownable, IBionetRouter {
         noZeroAddress
         returns (uint256 bal)
     {
-        bal = IBionetFunds(fundsAddress).getEscrowBalance(_account);
+        bal = IBionetFunds(exchangeAddress).getEscrowBalance(_account);
+    }
+
+    function estimateSellerDeposit(uint256 _price)
+        external
+        pure
+        returns (uint256 amt)
+    {
+        amt = FundsLib.calculateSellerDeposit(_price);
     }
 
     /**
@@ -69,9 +78,14 @@ contract BionetRouter is Ownable, IBionetRouter {
      */
     function createOffer(BionetTypes.Offer memory _offer)
         external
+        payable
         noZeroAddress
         returns (uint256 offerId)
     {
+        // Make sure they sent the deposit
+        uint256 deposit = FundsLib.calculateSellerDeposit(_offer.price);
+        require(msg.value >= deposit, "Insufficient deposit");
+
         require(_offer.seller == msg.sender, SELLER_NOT_CALLER);
         require(_offer.quantityAvailable > 0, INVALID_QTY);
         require(_offer.assetToken != address(0x0), BAD_ADDRESS);
@@ -104,7 +118,9 @@ contract BionetRouter is Ownable, IBionetRouter {
             "Exchange must be approved to transfer your IP NFT tokens"
         );
 
-        offerId = IBionetExchange(exchangeAddress).createOffer(_offer);
+        offerId = IBionetExchange(exchangeAddress).createOffer{
+            value: msg.value
+        }(_offer);
     }
 
     /**

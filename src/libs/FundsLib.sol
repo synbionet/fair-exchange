@@ -40,4 +40,12 @@ library FundsLib {
             amount = calculateFee(_price, CANCEL_REVOKE_FEE);
         }
     }
+
+    function calculateSellerDeposit(uint256 _price)
+        internal
+        pure
+        returns (uint256 amount)
+    {
+        amount = calculateFee(_price, CANCEL_REVOKE_FEE);
+    }
 }

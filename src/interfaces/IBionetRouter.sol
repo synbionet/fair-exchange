@@ -12,7 +12,13 @@ interface IBionetRouter {
     /**
      * @dev initialize with needed addresses
      */
-    function initialize(address _funds, address _exchange) external;
+    function initialize(address _exchange) external;
+
+    /**
+     * @dev estimate the seller's required deposit for
+     * a given price
+     */
+    function estimateSellerDeposit(uint256 _price) external returns (uint256);
 
     /**
      * @dev Create a new offer.
@@ -21,6 +27,7 @@ interface IBionetRouter {
      */
     function createOffer(BionetTypes.Offer memory _offer)
         external
+        payable
         returns (uint256);
 
     /**

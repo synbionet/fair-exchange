@@ -3,8 +3,8 @@ pragma solidity ^0.8.16;
 
 import "./BionetTypes.sol";
 import "./libs/FundsLib.sol";
+import {ExchangeStorage} from "./libs/ExchangeStorageLib.sol";
 import "./BionetConstants.sol";
-import "./libs/CountersLib.sol";
 import "./interfaces/IBionetFunds.sol";
 import "./interfaces/IBionetVoucher.sol";
 import "./interfaces/IBionetExchange.sol";
@@ -18,8 +18,6 @@ import "openzeppelin/security/ReentrancyGuard.sol";
  */
 contract BionetExchange is IBionetExchange, ReentrancyGuard {
     using Address for address payable;
-    using CountersLib for CountersLib.Counter;
-    CountersLib.Counter private _counter;
 
     // Address of the Funds contract
     address fundsAddress;
@@ -27,11 +25,6 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     address routerAddress;
     // Address of the Voucher
     address voucherAddress;
-
-    // offerid => offer
-    mapping(uint256 => BionetTypes.Offer) offers;
-    // exchangeid => exchange
-    mapping(uint256 => BionetTypes.Exchange) exchanges;
 
     modifier onlyRouter() {
         require(msg.sender == routerAddress, UNAUTHORIZED_ACCESS);
@@ -54,16 +47,23 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     /**
      * @dev See {IBionetExchange}
      *
+     * Router does all basic validation
+     *
      * Emits OfferCreated
      */
     function createOffer(BionetTypes.Offer memory _offer)
         external
+        payable
         onlyRouter
         returns (uint256)
     {
-        uint256 oid = _counter.nextOfferId();
+        // Create the Offer
+        uint256 oid = ExchangeStorage.nextOfferId();
         _offer.id = oid;
-        offers[oid] = _offer;
+        ExchangeStorage.entities().offers[oid] = _offer;
+
+        // Update seller's escrow
+        ExchangeStorage.deposit(_offer.seller, msg.value);
 
         emit OfferCreated(oid, _offer.seller, _offer);
         return oid;
@@ -79,7 +79,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      *  - Caller is not the seller listed in the offer
      */
     function voidOffer(address _caller, uint256 _offerId) external onlyRouter {
-        BionetTypes.Offer storage offer = getValidOffer(_offerId);
+        BionetTypes.Offer storage offer = ExchangeStorage.fetchValidOffer(
+            _offerId
+        );
         require(_caller == offer.seller, SELLER_NOT_CALLER);
         offer.voided = true;
         emit OfferVoided(_offerId, _caller);
@@ -102,21 +104,26 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         onlyRouter
         returns (uint256)
     {
-        // check the offer exists and is not voided
-        BionetTypes.Offer memory offer = getValidOffer(_offerId);
-        require(msg.value >= offer.price, INSUFFICIENT_FUNDS);
+        // check the offer exists and is not voided. You cannot commit
+        // to voided Offers
+        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
+            _offerId
+        );
+        require(msg.value >= offer.price, "Paid too low for offer");
 
         // create the exchange
-        uint256 eid = _counter.nextExchangeId();
-        (, BionetTypes.Exchange storage exchange) = fetchExchange(eid);
+        uint256 eid = ExchangeStorage.nextExchangeId();
+        (, BionetTypes.Exchange storage exchange) = ExchangeStorage
+            .fetchExchange(eid);
+
         exchange.id = eid;
         exchange.offerId = _offerId;
         exchange.buyer = _buyer;
         exchange.redeemBy = block.timestamp + WEEK; // Set the redeem timer
         exchange.state = BionetTypes.ExchangeState.Committed;
 
-        // escrow the funds
-        IBionetFunds(fundsAddress).deposit{value: msg.value}(_buyer);
+        // escrow funds
+        ExchangeStorage.deposit(_buyer, msg.value);
 
         // issue token to buyer
         IBionetVoucher(voucherAddress).issueVoucher(_buyer, eid);
@@ -138,18 +145,23 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      *  - Caller is not the exchange buyer
      */
     function cancel(address _buyer, uint256 _exchangeId) external onlyRouter {
-        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
-            _exchangeId
-        );
+        BionetTypes.Exchange storage exchange = ExchangeStorage
+            .fetchValidExchange(_exchangeId);
         require(_buyer == exchange.buyer, BUYER_NOT_CALLER);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Committed,
+            "Not in committed state"
+        );
 
         // It doesn't matter if the voucher expired or not, still canceling...
         // as the fee is the same
         exchange.state = BionetTypes.ExchangeState.Canceled;
         exchange.finalizedDate = block.timestamp;
 
-        // Get some information from the offer needed to finalize
-        BionetTypes.Offer memory offer = offers[exchange.offerId];
+        // Get some information from the offer needed to finalize.
+        BionetTypes.Offer memory offer = ExchangeStorage.fetchOffer(
+            exchange.offerId
+        );
         finalizeCommittment(
             exchange.id,
             offer.seller,
@@ -182,11 +194,15 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         onlyRouter
         nonReentrant
     {
-        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
-            _exchangeId
+        BionetTypes.Exchange storage exchange = ExchangeStorage
+            .fetchValidExchange(_exchangeId);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Committed,
+            "Not in committed state"
         );
-
-        BionetTypes.Offer memory offer = offers[exchange.offerId];
+        BionetTypes.Offer memory offer = ExchangeStorage.fetchOffer(
+            exchange.offerId
+        );
         require(_caller == offer.seller, SELLER_NOT_CALLER);
 
         // check if voucher expired (redeem period)
@@ -210,17 +226,18 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, true);
         } else {
             // do the revoke. Seller pays the penalty
-            uint256 cost = FundsLib.calculateCost(
-                offer.price,
-                BionetTypes.ExchangeState.Revoked
-            );
-            require(msg.value >= cost, INSUFFICIENT_FUNDS);
+            //uint256 cost = FundsLib.calculateCost(
+            //    offer.price,
+            //    BionetTypes.ExchangeState.Revoked
+            //);
+            //require(msg.value >= cost, INSUFFICIENT_FUNDS);
 
             exchange.state = BionetTypes.ExchangeState.Revoked;
             exchange.finalizedDate = block.timestamp;
 
             // escrow the funds. We need to move the ether to funds
-            IBionetFunds(fundsAddress).deposit{value: msg.value}(_caller);
+            // REPLACE
+            //IBionetFunds(fundsAddress).deposit{value: msg.value}(_caller);
 
             finalizeCommittment(
                 exchange.id,
@@ -249,12 +266,17 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      *  - Caller is not the buyer
      */
     function redeem(address _buyer, uint256 _exchangeId) external onlyRouter {
-        BionetTypes.Exchange storage exchange = fetchCommittedExchange(
-            _exchangeId
+        BionetTypes.Exchange storage exchange = ExchangeStorage
+            .fetchValidExchange(_exchangeId);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Committed,
+            "Not in committed state"
         );
         require(exchange.buyer == _buyer, BUYER_NOT_CALLER);
+        BionetTypes.Offer memory offer = ExchangeStorage.fetchOffer(
+            exchange.offerId
+        );
 
-        BionetTypes.Offer memory offer = offers[exchange.offerId];
         bool voucherExpired = block.timestamp > exchange.redeemBy;
         if (voucherExpired) {
             // treat as a cancel. Buyer pays the penalty
@@ -308,13 +330,19 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      * Will revert if caller is not the buyer and the time has not expired
      */
     function finalize(address _buyer, uint256 _exchangeId) external onlyRouter {
-        BionetTypes.Exchange storage exchange = fetchRedeemedExchange(
-            _exchangeId
+        BionetTypes.Exchange storage exchange = ExchangeStorage
+            .fetchValidExchange(_exchangeId);
+        require(
+            exchange.state == BionetTypes.ExchangeState.Redeemed,
+            "Not in redeemed state"
         );
+
         bool disputeExpired = block.timestamp > exchange.disputeBy;
         if (_buyer == exchange.buyer || disputeExpired == true) {
             // wrap it up...
-            BionetTypes.Offer memory offer = offers[exchange.offerId];
+            BionetTypes.Offer memory offer = ExchangeStorage.entities().offers[
+                exchange.offerId
+            ];
             exchange.state = BionetTypes.ExchangeState.Completed;
             exchange.finalizedDate = block.timestamp;
 
@@ -330,6 +358,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             );
 
             // release funds
+            // REPLACE
             IBionetFunds(fundsAddress).releaseFunds(
                 offer.seller,
                 exchange.buyer,
@@ -343,6 +372,12 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         }
     }
 
+    function withdraw(address _account) external onlyRouter {
+        uint256 amt = ExchangeStorage.withdraw(_account);
+        payable(_account).sendValue(amt);
+        // TODO: Emit event
+    }
+
     /** Views **/
 
     /**
@@ -351,10 +386,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     function getOffer(uint256 _offerId)
         public
         view
-        returns (bool exists, BionetTypes.Offer memory offer)
+        returns (BionetTypes.Offer memory offer)
     {
-        // TODO: replace with getValidOffer
-        (exists, offer) = fetchOffer(_offerId);
+        offer = ExchangeStorage.fetchOffer(_offerId);
     }
 
     /**
@@ -363,86 +397,30 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     function getExchange(uint256 _exchangeId)
         public
         view
-        returns (bool exists, BionetTypes.Exchange memory exchange)
+        returns (BionetTypes.Exchange memory exchange)
     {
-        (exists, exchange) = fetchExchange(_exchangeId);
+        exchange = ExchangeStorage.fetchValidExchange(_exchangeId);
+    }
+
+    /**
+     * @dev Return the escrow balance of 'account'
+     */
+    function getEscrowBalance(address _account)
+        external
+        view
+        returns (uint256 bal)
+    {
+        bal = ExchangeStorage.funds().escrow[_account];
+    }
+
+    /**
+     * @dev Return the protocol balance
+     */
+    function getProtocolBalance() external view returns (uint256 bal) {
+        bal = ExchangeStorage.funds().fees;
     }
 
     /** Internal */
-
-    /**
-     * Fetch an offer and return if it exists
-     */
-    function fetchOffer(uint256 _offerId)
-        internal
-        view
-        returns (bool exists, BionetTypes.Offer storage offer)
-    {
-        offer = offers[_offerId];
-        exists = (offer.id > 0 && _offerId == offer.id);
-    }
-
-    /**
-     * Get an offer an revert if doesn't exist or is voided
-     */
-    function getValidOffer(uint256 _offerId)
-        internal
-        view
-        returns (BionetTypes.Offer storage offer)
-    {
-        bool exists;
-        (exists, offer) = fetchOffer(_offerId);
-        require(exists, "Offer doesn't exist");
-        require(!offer.voided, "Offer is void");
-    }
-
-    /**
-     * Get an exchange and return if it exists
-     */
-    function fetchExchange(uint256 _exchangeId)
-        internal
-        view
-        returns (bool exists, BionetTypes.Exchange storage exchange)
-    {
-        exchange = exchanges[_exchangeId];
-        exists = (exchange.id > 0 && _exchangeId == exchange.id);
-    }
-
-    /**
-     * Fetch an exchange.  Revert if it doesn't exist or
-     * not in the committed state.
-     */
-    function fetchCommittedExchange(uint256 _exchangeId)
-        internal
-        view
-        returns (BionetTypes.Exchange storage exchange)
-    {
-        exchange = exchanges[_exchangeId];
-        bool exists = (exchange.id > 0 && _exchangeId == exchange.id);
-        require(exists, EXCHANGE_404);
-        require(
-            exchange.state == BionetTypes.ExchangeState.Committed,
-            EXPECTED_COMMIT_STATE
-        );
-    }
-
-    /**
-     * Fetch an exchange.  Revert if it doesn't exist or
-     * not in the redeemed state.
-     */
-    function fetchRedeemedExchange(uint256 _exchangeId)
-        internal
-        view
-        returns (BionetTypes.Exchange storage exchange)
-    {
-        exchange = exchanges[_exchangeId];
-        bool exists = (exchange.id > 0 && _exchangeId == exchange.id);
-        require(exists, EXCHANGE_404);
-        require(
-            exchange.state == BionetTypes.ExchangeState.Redeemed,
-            EXPECTED_REDEEMED_STATE
-        );
-    }
 
     /**
      * Burns voucher and release funds based on the exchange state
@@ -457,12 +435,55 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         // burn the voucher
         IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
 
-        // release funds based on the state
-        IBionetFunds(fundsAddress).releaseFunds(
-            _seller,
-            _buyer,
-            _price,
-            _state
-        );
+        if (_state == BionetTypes.ExchangeState.Canceled) {
+            // Canceled by buyer or protocol timeout
+            // Calculate fee
+            uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
+
+            ExchangeStorage.transfer(_buyer, _seller, fee);
+
+            // Buyer penalty
+            uint256 refundLessPenalty = _price - fee;
+
+            // Update amount available to withdraw
+            // Seller gets the penalty fee
+            ExchangeStorage.funds().availableToWithdraw[_seller] += fee;
+            // Buyer gets price - fee back
+            ExchangeStorage.funds().availableToWithdraw[
+                _buyer
+            ] += refundLessPenalty;
+
+            // TODO:
+            //emit ReleaseFunds(_seller, fee);
+            // emit ReleaseFunds(_buyer, _price - fee);
+        }
+        if (_state == BionetTypes.ExchangeState.Revoked) {
+            // by seller
+            uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
+            // increase buyers escrow by 'fee'
+            ExchangeStorage.transfer(_seller, _buyer, fee);
+            // Seller penalty
+            uint256 refundPlusPenalty = _price + fee;
+            ExchangeStorage.funds().availableToWithdraw[
+                _buyer
+            ] += refundPlusPenalty;
+
+            //emit ReleaseFunds(_buyer, _price + fee);
+        }
+        if (_state == BionetTypes.ExchangeState.Completed) {
+            // all good
+            uint256 fee = FundsLib.calculateFee(_price, PROTOCOL_FEE);
+
+            // Buyer pays the seller
+            ExchangeStorage.transfer(_buyer, _seller, _price);
+            // Seller pays protocol fee
+            ExchangeStorage.transferFee(_seller, fee);
+
+            uint256 avail = _price - fee;
+            ExchangeStorage.funds().availableToWithdraw[_seller] += avail;
+
+            //emit ReleaseFunds(_seller, _price - fee);
+            // emit FeeCollected(fee);
+        }
     }
 }

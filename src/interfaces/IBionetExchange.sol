@@ -90,6 +90,7 @@ interface IBionetExchange {
      */
     function createOffer(BionetTypes.Offer memory _offer)
         external
+        payable
         returns (uint256);
 
     /**
@@ -132,12 +133,27 @@ interface IBionetExchange {
     function finalize(address _buyer, uint256 exchangeId) external;
 
     /**
+     * @dev Withdraw funds from Escrow
+     */
+    function withdraw(address _account) external;
+
+    /**
+     * @dev Return the escrow balance of 'account'
+     */
+    function getEscrowBalance(address _account) external view returns (uint256);
+
+    /**
+     * @dev Return the protocol balance
+     */
+    function getProtocolBalance() external view returns (uint256);
+
+    /**
      * @dev Return an Offer
      */
     function getOffer(uint256 _offerId)
         external
         view
-        returns (bool exists, BionetTypes.Offer memory offer);
+        returns (BionetTypes.Offer memory offer);
 
     /**
      * @dev Return an Exchange
@@ -145,5 +161,5 @@ interface IBionetExchange {
     function getExchange(uint256 _exchangeId)
         external
         view
-        returns (bool exists, BionetTypes.Exchange memory exchange);
+        returns (BionetTypes.Exchange memory exchange);
 }

@@ -31,7 +31,7 @@ contract AnvilDeployScript is Script {
         address vA = address(voucher);
         address eA = address(exchange);
 
-        router.initialize(fA, eA);
+        router.initialize(eA);
         funds.initialize(rA, eA);
         voucher.initialize(eA);
         exchange.initialize(rA, fA, vA);

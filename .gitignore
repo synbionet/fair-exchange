@@ -1,6 +1,5 @@
+
 # Compiler files
-.DS_Store
-TODO.txt
 cache/
 out/
 
@@ -13,4 +12,8 @@ out/
 # Dotenv file
 .env
 
+# Misc
 .vscode
+.DS_Store
+TODO.txt
+DESIGN.txt
