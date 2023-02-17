@@ -15,8 +15,9 @@ interface IBionetRouter {
     function initialize(address _exchange) external;
 
     /**
-     * @dev estimate the seller's required deposit for
-     * a given price
+     * @dev Estimate required deposit
+     * Estimate and return the seller's required deposit for a given price.
+     * Needed to 'createOffer'
      */
     function estimateSellerDeposit(uint256 _price) external returns (uint256);
 
@@ -24,6 +25,12 @@ interface IBionetRouter {
      * @dev Create a new offer.
      *
      * Called by the seller.
+     * Can revert for several reasons. See {BionetExchange.createOffer}.
+     *
+     * Ensure the seller has approved the exchange to transfer before
+     * calling this.
+     *
+     * Seller should send ether for required deposit. See {estimateSellerDeposit}
      */
     function createOffer(BionetTypes.Offer memory _offer)
         external
@@ -33,7 +40,8 @@ interface IBionetRouter {
     /**
      * @dev Void an existing offer
      *
-     * Called by the seller to 'delist' and offering.
+     * Called by the seller to 'delist' and offering. Exising exchanges
+     * are still valid.
      */
     function voidOffer(uint256 _offerId) external;
 

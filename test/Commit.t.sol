@@ -11,6 +11,9 @@ import {MockAsset} from "./mocks/MockAsset.sol";
 contract CommitTest is BionetTestBase {
     uint256 constant offerPrice = 2.3 ether;
 
+    // TODO:
+    function test_buyer_withdraw_after_commit() public {}
+
     function test_commit_wrong_price() public {
         uint256 oid = _createOffer(offerPrice);
 
