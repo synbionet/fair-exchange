@@ -51,7 +51,7 @@ contract CommitRevokeTest is BaseBionetTest {
         vm.stopPrank();
 
         uint256 sellerBal = funds.getEscrowBalance(seller);
-        assertEq(sellerBal, 0);
+        assertEq(sellerBal, revokeCost);
 
         uint256 buyerAfterRevoke = funds.getEscrowBalance(buyer);
         assertEq(buyerAfterRevoke, price + revokeCost);
