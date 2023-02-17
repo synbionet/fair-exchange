@@ -219,6 +219,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.state = BionetTypes.ExchangeState.Revoked;
             exchange.finalizedDate = block.timestamp;
 
+            // escrow the funds. We need to move the ether to funds
+            IBionetFunds(fundsAddress).deposit{value: msg.value}(_caller);
+
             finalizeCommittment(
                 exchange.id,
                 offer.seller,
