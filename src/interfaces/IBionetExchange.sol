@@ -3,53 +3,50 @@ pragma solidity ^0.8.16;
 
 import "../BionetTypes.sol";
 
-/**
- * @dev Interface to the Bionet Exchange
- *
- * Contain the core logic and state transistions for the Bionet.
- *
- */
+/// Core logic and state transistions for the Bionet.
+///  - see implementation for the details of each function -
 interface IBionetExchange {
-    /**
-     * @dev Emitted when an offer is created
-     *
-     * @param offerId the offer id
-     * @param seller the address of the seller
-     * @param offer a copy of the offer
-     */
+    /// @dev Emitted when an offer is created
+    /// @param offerId of the offer
+    /// @param seller creating the offer
+    /// @param offer model
     event OfferCreated(
         uint256 indexed offerId,
         address indexed seller,
         BionetTypes.Offer offer
     );
 
-    /**
-     * @dev Emitted when an offer is voided
-     *
-     */
+    /// @dev Emitted when a seller voids an offer
+    /// @param offerId of the offer voided
+    /// @param seller of the offer
     event OfferVoided(uint256 indexed offerId, address indexed seller);
 
-    /**
-     * @dev Emitted when a buyer commits to purchase
-     */
+    /// @dev Emitted when an exchange is created from a 'commit'
+    /// @param offerId of the offer
+    /// @param exchangeId the new exchange
+    /// @param buyer committing to the exchange
     event ExchangeCreated(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed buyer
     );
 
-    /**
-     * @dev Emitted when a seller revokes
-     */
+    /// @dev Emitted when the seller revokes an exchange
+    /// @param offerId of the offer
+    /// @param exchangeId the new exchange
+    /// @param seller revoking the exchange
     event ExchangeRevoked(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         address indexed seller
     );
 
-    /**
-     * @dev Emitted when a buyer cancels
-     */
+    /// @dev Emitted when a buyer cancels or the protocol times out
+    /// during the 'redeem' period.
+    /// @param offerId of the offer
+    /// @param exchangeId the new exchange
+    /// @param buyer committing to the exchange
+    /// @param timerExpired is true if this was a result of expiration
     event ExchangeCanceled(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
@@ -57,105 +54,79 @@ interface IBionetExchange {
         bool timerExpired
     );
 
-    /**
-     * @dev Emitted when a buyer redeems
-     */
+    /// @dev Emitted when the buyer calls redeem
+    /// @param offerId of the offer
+    /// @param exchangeId the new exchange
+    /// @param seller of the offer
     event ExchangeRedeemed(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
-        address indexed seller,
-        uint256 timestamp
+        address indexed seller
     );
 
-    /**
-     * @dev Emitted when a buyer redeems
-     */
+    /// @dev Emitted when the buyer finalizes the exchange or the
+    /// dispute period times out.
+    /// @param offerId of the offer
+    /// @param exchangeId the new exchange
+    /// @param timestamp of completion
     event ExchangeCompleted(
         uint256 indexed offerId,
         uint256 indexed exchangeId,
         uint256 timestamp
     );
 
-    /**
-     * @dev initialize with needed addresses
-     */
+    /// @dev Emitted on an Ether withdraw from the exchange.
+    /// Usually happens at an end state in the protocol.
+    /// @param account of the exchange withdraw from
+    /// @param amount withdrawn
+    event Withdraw(address account, uint256 amount);
+
+    /// @dev Emitted when funds are released from escrow
+    /// and available to withdraw.
+    /// @param account the funds where released to
+    /// @param amount released
+    event ReleaseEscrow(address account, uint256 amount);
+
+    /// @dev Emitted when the protocol collects a fee.
+    /// @param exchangeId of the exchange generating the fee
+    /// @param amount collected
+    event FeeCollected(uint256 exchangeId, uint256 amount);
+
     function initialize(address _router, address _voucher) external;
 
-    /**
-     * @dev Create an Offer
-     */
     function createOffer(BionetTypes.Offer memory _offer)
         external
         payable
         returns (uint256);
 
-    /**
-     * @dev Seller can void the offer, removing it from future purchases.
-     *
-     * This does not effect existing exchanges against the offer.
-     */
     function voidOffer(address _caller, uint256 _offerId) external;
 
-    /**
-     * @dev Commit to an Offer.
-     *
-     * This will tokenize the committment by issuing a voucher to the buyer
-     */
     function commit(address _buyer, uint256 _offerId)
         external
         payable
         returns (uint256);
 
-    /**
-     * @dev Cancel an committment
-     */
     function cancel(address _buyer, uint256 exchangeId) external;
 
-    /**
-     * @dev Seller can revoke the exchange IFF the exchange state == COMMITTED
-     *
-     * This will calculate payoffs and release funds as needed.
-     */
-    function revoke(address _seller, uint256 _exchangeId) external payable;
+    function revoke(address _seller, uint256 _exchangeId) external;
 
-    /**
-     * @dev Redeem a voucher
-     */
     function redeem(address _buyer, uint256 exchangeId) external;
 
-    /**
-     * @dev Finalize an exchange
-     */
     function finalize(address _buyer, uint256 exchangeId) external;
 
-    /**
-     * @dev Withdraw funds from Escrow
-     */
     function withdraw(address _account) external;
 
-    /**
-     * @dev Return the escrow balance of 'account'
-     */
     function getEscrowBalance(address _account) external view returns (uint256);
 
-    /**
-     * @dev Return the protocol balance
-     */
     function getProtocolBalance() external view returns (uint256);
 
-    /**
-     * @dev Return an Offer
-     */
     function getOffer(uint256 _offerId)
         external
         view
-        returns (BionetTypes.Offer memory offer);
+        returns (bool, BionetTypes.Offer memory offer);
 
-    /**
-     * @dev Return an Exchange
-     */
     function getExchange(uint256 _exchangeId)
         external
         view
-        returns (BionetTypes.Exchange memory exchange);
+        returns (bool, BionetTypes.Exchange memory exchange);
 }

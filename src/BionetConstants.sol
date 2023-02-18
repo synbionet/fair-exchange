@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 // *** Constant used across contracts ***
+// TODO: Clean this up and standardize messages
 
 // Fees are fixed for MVP. Configurable in the future. Use 'basis points'
 uint256 constant PROTOCOL_FEE = 300; // 3%

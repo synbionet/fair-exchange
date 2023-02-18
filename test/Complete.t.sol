@@ -2,12 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "../src/BionetTypes.sol";
-import {PROTOCOL_FEE, CANCEL_REVOKE_FEE, WEEK} from "../src/BionetConstants.sol";
 import {FundsLib} from "../src/libs/FundsLib.sol";
 import {BionetTestBase} from "./BionetTestBase.sol";
+import {PROTOCOL_FEE, CANCEL_REVOKE_FEE, WEEK} from "../src/BionetConstants.sol";
 
 import {MockAsset} from "./mocks/MockAsset.sol";
-import "openzeppelin/token/ERC1155/IERC1155.sol";
+import {IERC1155} from "openzeppelin/token/ERC1155/IERC1155.sol";
 
 /**
  */
@@ -31,7 +31,7 @@ contract CompleteTest is BionetTestBase {
         uint256 offerId;
         uint256 exchangeId;
         (offerId, exchangeId) = _createOfferAndCommit(offerPrice);
-        BionetTypes.Offer memory offer = exchange.getOffer(offerId);
+        (, BionetTypes.Offer memory offer) = exchange.getOffer(offerId);
 
         Balances memory bbb = _checkAllBalance(buyer);
         Balances memory sbb = _checkAllBalance(seller);
@@ -107,7 +107,7 @@ contract CompleteTest is BionetTestBase {
         uint256 offerId;
         uint256 exchangeId;
         (offerId, exchangeId) = _createOfferAndCommit(offerPrice);
-        BionetTypes.Offer memory offer = exchange.getOffer(offerId);
+        (, BionetTypes.Offer memory offer) = exchange.getOffer(offerId);
 
         Balances memory bbb = _checkAllBalance(buyer);
         Balances memory sbb = _checkAllBalance(seller);
@@ -183,6 +183,6 @@ contract CompleteTest is BionetTestBase {
         returns (Balances memory bal)
     {
         bal.eth = _account.balance;
-        bal.escrow = router.escrowBalance(_account);
+        bal.escrow = router.getEscrowBalance(_account);
     }
 }

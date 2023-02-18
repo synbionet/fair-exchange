@@ -14,7 +14,7 @@ contract OfferTest is BionetTestBase {
 
     function setUp() public virtual override {
         super.setUp();
-        requiredDeposit = router.estimateSellerDeposit(price);
+        requiredDeposit = router.getSellerDeposit(price);
     }
 
     function test_deposit_createOffer() public {
@@ -43,7 +43,7 @@ contract OfferTest is BionetTestBase {
         vm.stopPrank();
 
         // Correct escrow
-        uint256 bal = router.escrowBalance(seller);
+        uint256 bal = router.getEscrowBalance(seller);
         assertEq(bal, requiredDeposit);
     }
 

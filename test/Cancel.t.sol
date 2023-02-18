@@ -34,7 +34,7 @@ contract CancelTest is BionetTestBase {
         vm.stopPrank();
 
         // Check escrow
-        uint256 bal = router.escrowBalance(buyer);
+        uint256 bal = router.getEscrowBalance(buyer);
         assertEq(bal, expectedRefund);
 
         // Withdraw money
@@ -49,7 +49,7 @@ contract CancelTest is BionetTestBase {
         uint256 eba = buyer.balance;
 
         assertGt(eba, ebb);
-        uint256 bala = router.escrowBalance(buyer);
+        uint256 bala = router.getEscrowBalance(buyer);
         assertEq(bala, 0);
 
         // Check the voucher is gone
@@ -75,7 +75,7 @@ contract CancelTest is BionetTestBase {
         vm.stopPrank();
 
         // Check escrow
-        uint256 bal = router.escrowBalance(buyer);
+        uint256 bal = router.getEscrowBalance(buyer);
         assertEq(bal, expectedRefund);
 
         // Withdraw money
@@ -90,11 +90,13 @@ contract CancelTest is BionetTestBase {
         uint256 eba = buyer.balance;
 
         assertGt(eba, ebb);
-        uint256 bala = router.escrowBalance(buyer);
+        uint256 bala = router.getEscrowBalance(buyer);
         assertEq(bala, 0);
 
         // Check the state of the exchange
-        BionetTypes.Exchange memory exchange = exchange.getExchange(exchangeId);
+        (, BionetTypes.Exchange memory exchange) = exchange.getExchange(
+            exchangeId
+        );
         assertTrue(exchange.state == BionetTypes.ExchangeState.Canceled);
         assertEq(exchange.finalizedDate, block.timestamp);
 

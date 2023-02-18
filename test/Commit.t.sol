@@ -14,21 +14,21 @@ contract CommitTest is BionetTestBase {
     function test_buyer_cant_withdraw_after_commit() public {
         uint256 offerId = _createOffer(offerPrice);
 
-        uint256 eb = router.escrowBalance(buyer);
+        uint256 eb = router.getEscrowBalance(buyer);
         assertEq(eb, 0);
 
         vm.startPrank(buyer);
         router.commit{value: offerPrice}(offerId);
         vm.stopPrank();
 
-        uint256 ea = router.escrowBalance(buyer);
+        uint256 ea = router.getEscrowBalance(buyer);
         assertEq(ea, offerPrice);
 
         vm.startPrank(buyer);
         router.withdraw();
         vm.stopPrank();
 
-        uint256 ea1 = router.escrowBalance(buyer);
+        uint256 ea1 = router.getEscrowBalance(buyer);
         assertEq(ea1, offerPrice);
     }
 
@@ -66,7 +66,7 @@ contract CommitTest is BionetTestBase {
         router.commit{value: offerPrice}(oid);
         vm.stopPrank();
 
-        uint256 bal = router.escrowBalance(buyer);
+        uint256 bal = router.getEscrowBalance(buyer);
         assertEq(bal, offerPrice);
     }
 }

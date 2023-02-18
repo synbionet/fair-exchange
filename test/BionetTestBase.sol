@@ -56,7 +56,7 @@ contract BionetTestBase is Test {
             address(ipAsset),
             1
         );
-        uint256 deposit = router.estimateSellerDeposit(offerPrice);
+        uint256 deposit = router.getSellerDeposit(offerPrice);
         vm.startPrank(seller);
         oid = router.createOffer{value: deposit}(offer);
         vm.stopPrank();
@@ -76,7 +76,7 @@ contract BionetTestBase is Test {
             address(ipAsset),
             1
         );
-        uint256 deposit = router.estimateSellerDeposit(offerPrice);
+        uint256 deposit = router.getSellerDeposit(offerPrice);
         vm.startPrank(seller);
         oid = router.createOffer{value: deposit}(offer);
         vm.stopPrank();

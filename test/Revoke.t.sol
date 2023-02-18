@@ -28,8 +28,8 @@ contract RevokeTest is BionetTestBase {
         uint256 expectedRefund = offerPrice + revokeFee;
 
         // escrow
-        uint256 beb = router.escrowBalance(buyer);
-        uint256 seb = router.escrowBalance(seller);
+        uint256 beb = router.getEscrowBalance(buyer);
+        uint256 seb = router.getEscrowBalance(seller);
 
         // Seller should have the revoke fee in escrow
         assertEq(seb, revokeFee, "seller");
@@ -45,8 +45,8 @@ contract RevokeTest is BionetTestBase {
         vm.stopPrank();
 
         // Check post revoke escrow
-        uint256 bea = router.escrowBalance(buyer);
-        uint256 sea = router.escrowBalance(seller);
+        uint256 bea = router.getEscrowBalance(buyer);
+        uint256 sea = router.getEscrowBalance(seller);
         assertEq(bea, expectedRefund);
         assertEq(sea, 0);
 
@@ -88,7 +88,9 @@ contract RevokeTest is BionetTestBase {
         vm.stopPrank();
 
         // Check the state of the exchange = CANCELED
-        BionetTypes.Exchange memory exchange = exchange.getExchange(exchangeId);
+        (, BionetTypes.Exchange memory exchange) = exchange.getExchange(
+            exchangeId
+        );
         assertTrue(exchange.state == BionetTypes.ExchangeState.Canceled);
         assertEq(exchange.finalizedDate, block.timestamp);
 

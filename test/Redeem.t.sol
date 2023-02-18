@@ -26,11 +26,13 @@ contract RedeemTest is BionetTestBase {
         assertEq(voucher.balanceOf(buyer), 0);
 
         // Money still escrowed
-        uint256 bal = router.escrowBalance(buyer);
+        uint256 bal = router.getEscrowBalance(buyer);
         assertEq(bal, offerPrice);
 
         // Check the state of the exchange = CANCELED
-        BionetTypes.Exchange memory exchange = exchange.getExchange(exchangeId);
+        (, BionetTypes.Exchange memory exchange) = exchange.getExchange(
+            exchangeId
+        );
         assertTrue(exchange.state == BionetTypes.ExchangeState.Redeemed);
         assertEq(exchange.disputeBy, block.timestamp + WEEK);
     }
@@ -40,21 +42,21 @@ contract RedeemTest is BionetTestBase {
         uint256 exchangeId;
         (offerId, exchangeId) = _createOfferAndCommit(offerPrice);
 
-        uint256 eb = router.escrowBalance(buyer);
+        uint256 eb = router.getEscrowBalance(buyer);
         assertEq(eb, offerPrice);
 
         vm.startPrank(buyer);
         router.redeem(exchangeId);
         vm.stopPrank();
 
-        uint256 ea = router.escrowBalance(buyer);
+        uint256 ea = router.getEscrowBalance(buyer);
         assertEq(ea, offerPrice);
 
         vm.startPrank(buyer);
         router.withdraw();
         vm.stopPrank();
 
-        uint256 ea1 = router.escrowBalance(buyer);
+        uint256 ea1 = router.getEscrowBalance(buyer);
         assertEq(ea1, offerPrice);
     }
 }

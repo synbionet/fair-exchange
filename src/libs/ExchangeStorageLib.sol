@@ -3,10 +3,10 @@ pragma solidity ^0.8.16;
 
 import "../BionetTypes.sol";
 
-/**
- * Core storage for the Exchange
- */
+/// @dev Storage for the Exchange and helpers to access
+/// data.
 library ExchangeStorage {
+    // Storage slots
     bytes32 internal constant FUNDS_POSITION =
         keccak256("fair-exchange.protocol.funds");
     bytes32 internal constant ENTITIES_POSITION =
@@ -14,6 +14,7 @@ library ExchangeStorage {
     bytes32 internal constant COUNTER_POSITION =
         keccak256("fair-exchange.protocol.counter");
 
+    // Address used for protocol fees collected
     address internal constant PROTOCOL_FEE_ADDRESS = address(0x0);
 
     struct Counters {
@@ -74,36 +75,26 @@ library ExchangeStorage {
         value = counters()._exchangeId;
     }
 
-    /**
-     * @dev Get and Offer by Id
-     *
-     * Reverts if:
-     * - Offer doesn't exist
-     */
+    /// @dev Get an Offer by Id
+    /// Reverts if:
     function fetchOffer(uint256 _offerId)
         internal
         view
-        returns (BionetTypes.Offer storage offer)
+        returns (bool exists, BionetTypes.Offer storage offer)
     {
-        bool exists;
         offer = entities().offers[_offerId];
         exists = (offer.id > 0 && _offerId == offer.id);
-        require(exists, "Offer doesn't exist");
     }
 
-    /**
-     * @dev Get and Offer by Id
-     *
-     * Reverts if:
-     * - Offer doesn't exist
-     * - Offer is voided
-     */
+    /// @dev Get an Offer by Id with reverts
     function fetchValidOffer(uint256 _offerId)
         internal
         view
         returns (BionetTypes.Offer storage offer)
     {
-        offer = fetchOffer(_offerId);
+        bool exists;
+        (exists, offer) = fetchOffer(_offerId);
+        require(exists, "Offer doesn't exist");
         require(!offer.voided, "Offer is void");
     }
 
@@ -127,9 +118,6 @@ library ExchangeStorage {
         require(exists, "Exchange doesn't exist");
     }
 
-    /**
-     * @dev Deposit amount into the caller escrow
-     */
     function deposit(address _account, uint256 _amount) internal {
         funds().escrow[_account] += _amount;
         funds().totalEscrow += _amount;
@@ -153,9 +141,6 @@ library ExchangeStorage {
         funds().escrow[_to] += _amount;
     }
 
-    /**
-     * @dev Transfer protocol fee
-     */
     function transferFee(address _from, uint256 _amount) internal {
         require(funds().escrow[_from] >= _amount, "Insufficient funds");
         funds().escrow[_from] -= _amount;
