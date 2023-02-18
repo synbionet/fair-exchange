@@ -11,8 +11,26 @@ import {MockAsset} from "./mocks/MockAsset.sol";
 contract CommitTest is BionetTestBase {
     uint256 constant offerPrice = 2.3 ether;
 
-    // TODO:
-    function test_buyer_withdraw_after_commit() public {}
+    function test_buyer_cant_withdraw_after_commit() public {
+        uint256 offerId = _createOffer(offerPrice);
+
+        uint256 eb = router.escrowBalance(buyer);
+        assertEq(eb, 0);
+
+        vm.startPrank(buyer);
+        router.commit{value: offerPrice}(offerId);
+        vm.stopPrank();
+
+        uint256 ea = router.escrowBalance(buyer);
+        assertEq(ea, offerPrice);
+
+        vm.startPrank(buyer);
+        router.withdraw();
+        vm.stopPrank();
+
+        uint256 ea1 = router.escrowBalance(buyer);
+        assertEq(ea1, offerPrice);
+    }
 
     function test_commit_wrong_price() public {
         uint256 oid = _createOffer(offerPrice);

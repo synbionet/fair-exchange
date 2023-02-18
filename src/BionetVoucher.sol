@@ -14,7 +14,6 @@ import "openzeppelin/token/ERC721/extensions/ERC721Burnable.sol";
  * TODO: Should the voucher be non-transferable once minted to a buyer?
  */
 contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
-    //address routerAddress;
     address exchangeAddress;
 
     modifier onlyExchange() {

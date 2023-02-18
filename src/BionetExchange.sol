@@ -332,9 +332,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         bool disputeExpired = block.timestamp > exchange.disputeBy;
         if (_buyer == exchange.buyer || disputeExpired == true) {
             // wrap it up...
-            BionetTypes.Offer memory offer = ExchangeStorage.entities().offers[
+            BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
                 exchange.offerId
-            ];
+            );
             exchange.state = BionetTypes.ExchangeState.Completed;
             exchange.finalizedDate = block.timestamp;
 
@@ -363,6 +363,8 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         }
     }
 
+    // TODO: Allow to trigger a state change if buyer or seller
+    // and a timer has expired.
     function withdraw(address _account) external onlyRouter {
         uint256 amt = ExchangeStorage.withdraw(_account);
         payable(_account).sendValue(amt);
@@ -423,10 +425,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         uint256 _price,
         BionetTypes.ExchangeState _state
     ) internal {
-        // burn the voucher
-        IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
-
         if (_state == BionetTypes.ExchangeState.Canceled) {
+            // burn the voucher
+            IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
+
             // Canceled by buyer or protocol timeout
             // Calculate fee
             uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
@@ -449,6 +451,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             // emit ReleaseFunds(_buyer, _price - fee);
         }
         if (_state == BionetTypes.ExchangeState.Revoked) {
+            // burn the voucher
+            IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
+
             // by seller
             uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
             // increase buyers escrow by 'fee'
