@@ -15,7 +15,10 @@ contract BionetVoucher is ERC721, ERC721Burnable, IBionetVoucher {
 
     // msg.sender must be the exchange address
     modifier onlyExchange() {
-        require(msg.sender == exchangeAddress, UNAUTHORIZED_ACCESS);
+        require(
+            msg.sender == exchangeAddress,
+            "Voucher: Can only be called by the exchange"
+        );
         _;
     }
 

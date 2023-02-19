@@ -23,7 +23,7 @@ contract BionetRouter is Ownable, IBionetRouter {
 
     // Check for the zero address
     modifier noZeroAddress() {
-        require(msg.sender != address(0x0), BAD_ADDRESS);
+        require(msg.sender != address(0x0), "Router: Zero address not allowed");
         _;
     }
 
@@ -108,19 +108,25 @@ contract BionetRouter is Ownable, IBionetRouter {
     {
         // Make sure they sent the deposit
         uint256 deposit = FundsLib.calculateSellerDeposit(_offer.price);
-        require(msg.value >= deposit, "Insufficient deposit");
+        require(msg.value >= deposit, "Router: Insufficient seller deposit");
         // Do some validation on the offer
-        require(_offer.seller == msg.sender, SELLER_NOT_CALLER);
-        require(_offer.quantityAvailable > 0, INVALID_QTY);
-        require(_offer.assetToken != address(0x0), BAD_ADDRESS);
-        require(_offer.voided == false, OFFER_VOIDED);
+        require(
+            _offer.seller == msg.sender,
+            "Router: offer.seller must be the caller"
+        );
+        require(_offer.quantityAvailable > 0, "Router: offer qty > 0");
+        require(
+            _offer.assetToken != address(0x0),
+            "Router: Asset token must have a valid address (not 0x0)"
+        );
+        require(_offer.voided == false, "Router: the offer cannot be voided");
 
         // Check the assetToken is an ERC1155 contract
         bool isValidAsset = ERC165Checker.supportsInterface(
             _offer.assetToken,
             type(IERC1155).interfaceId
         );
-        require(isValidAsset, NOT_ASSET);
+        require(isValidAsset, "Router: The asset is not an ERC1155 contract");
 
         // Check the seller owns at least the number (QTY) they're trying to sell
         uint256 numTokensOwned = IERC1155(_offer.assetToken).balanceOf(
@@ -129,7 +135,7 @@ contract BionetRouter is Ownable, IBionetRouter {
         );
         require(
             numTokensOwned >= _offer.quantityAvailable,
-            "Don't own enough IP tokens to offer"
+            "Router: The seller does not own enough ERC1155 tokens for the offer qty"
         );
 
         // Check the seller has approved the exchange to transfer
@@ -139,7 +145,7 @@ contract BionetRouter is Ownable, IBionetRouter {
         );
         require(
             approvedForExchange,
-            "Exchange must be approved to transfer your IP NFT tokens"
+            "Router: The exchange must be approved to transfer your ERC1155 tokens"
         );
 
         // Have the exchange create and store it

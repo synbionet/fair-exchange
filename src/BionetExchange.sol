@@ -25,7 +25,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
     // msg.sender must be the address of the router
     modifier onlyRouter() {
-        require(msg.sender == routerAddress, UNAUTHORIZED_ACCESS);
+        require(
+            msg.sender == routerAddress,
+            "Exchange: can only be called by the router"
+        );
         _;
     }
 
@@ -70,7 +73,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         BionetTypes.Offer storage offer = ExchangeStorage.fetchValidOffer(
             _offerId
         );
-        require(_caller == offer.seller, SELLER_NOT_CALLER);
+        require(_caller == offer.seller, "Exchange: caller must be the seller");
         offer.voided = true;
 
         emit OfferVoided(_offerId, _caller);
@@ -94,7 +97,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
             _offerId
         );
-        require(msg.value >= offer.price, "Paid too low for offer");
+        require(
+            msg.value >= offer.price,
+            "Exchange: Value sent must be >= price"
+        );
 
         // create the exchange with a new ID
         uint256 eid = ExchangeStorage.nextExchangeId();
@@ -129,10 +135,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     function cancel(address _buyer, uint256 _exchangeId) external onlyRouter {
         BionetTypes.Exchange storage exchange = ExchangeStorage
             .fetchValidExchange(_exchangeId);
-        require(_buyer == exchange.buyer, BUYER_NOT_CALLER);
+        require(_buyer == exchange.buyer, "Exchange: Caller must be the buyer");
         require(
             exchange.state == BionetTypes.ExchangeState.Committed,
-            "Not in committed state"
+            "Exchange: Wrong state. Expected committed"
         );
 
         // It doesn't matter if the voucher expired or not, still canceling...
@@ -173,12 +179,12 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             .fetchValidExchange(_exchangeId);
         require(
             exchange.state == BionetTypes.ExchangeState.Committed,
-            "Not in committed state"
+            "Exchange: Wrong state. Expected committed"
         );
         BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
             exchange.offerId
         );
-        require(_caller == offer.seller, SELLER_NOT_CALLER);
+        require(_caller == offer.seller, "Exchange: Seller must be the caller");
 
         // check if voucher expired (redeem period)
         bool voucherExpired = block.timestamp > exchange.redeemBy;
@@ -227,9 +233,9 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             .fetchValidExchange(_exchangeId);
         require(
             exchange.state == BionetTypes.ExchangeState.Committed,
-            "Not in committed state"
+            "Exchange: Wrong state. Expected committed"
         );
-        require(exchange.buyer == _buyer, BUYER_NOT_CALLER);
+        require(exchange.buyer == _buyer, "Exchange: buyer must be the caller");
         BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
             exchange.offerId
         );
@@ -299,7 +305,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             .fetchValidExchange(_exchangeId);
         require(
             exchange.state == BionetTypes.ExchangeState.Redeemed,
-            "Not in redeemed state"
+            "Exchange: Wrong state. Expected redeemed"
         );
 
         bool disputeExpired = block.timestamp > exchange.disputeBy;
@@ -332,7 +338,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
             emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
         } else {
-            revert("Not authorized to finalize the exchange");
+            revert("Exchange: Cannot be finalized");
         }
     }
 

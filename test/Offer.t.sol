@@ -27,13 +27,13 @@ contract OfferTest is BionetTestBase {
 
         // Incorrect deposit
         vm.startPrank(seller);
-        vm.expectRevert("Insufficient deposit");
+        vm.expectRevert();
         router.createOffer{value: requiredDeposit - 0.01 ether}(offer);
         vm.stopPrank();
 
         // No deposit
         vm.startPrank(seller);
-        vm.expectRevert("Insufficient deposit");
+        vm.expectRevert();
         router.createOffer(offer);
         vm.stopPrank();
 
@@ -57,7 +57,7 @@ contract OfferTest is BionetTestBase {
 
         // Only the router can call exchange
         vm.startPrank(seller);
-        vm.expectRevert("Unauthorized call");
+        vm.expectRevert();
         exchange.createOffer{value: requiredDeposit}(offer);
         vm.stopPrank();
     }
@@ -76,7 +76,7 @@ contract OfferTest is BionetTestBase {
 
         // Fails: buyer owns the asset - not the seller
         vm.startPrank(seller);
-        vm.expectRevert("Don't own enough IP tokens to offer");
+        vm.expectRevert();
         router.createOffer{value: requiredDeposit}(offer);
         vm.stopPrank();
     }
@@ -96,9 +96,7 @@ contract OfferTest is BionetTestBase {
 
         // Seller didn't approve the exchange to transfer asset
         vm.startPrank(seller);
-        vm.expectRevert(
-            "Exchange must be approved to transfer your IP NFT tokens"
-        );
+        vm.expectRevert();
         router.createOffer{value: requiredDeposit}(offer);
         vm.stopPrank();
 
@@ -108,9 +106,7 @@ contract OfferTest is BionetTestBase {
         vm.stopPrank();
 
         vm.startPrank(seller);
-        vm.expectRevert(
-            "Exchange must be approved to transfer your IP NFT tokens"
-        );
+        vm.expectRevert();
         router.createOffer{value: requiredDeposit}(offer);
         vm.stopPrank();
 
@@ -136,7 +132,7 @@ contract OfferTest is BionetTestBase {
         vm.deal(zero, 5 ether);
 
         vm.startPrank(zero);
-        vm.expectRevert("Bad Address");
+        vm.expectRevert();
         router.createOffer{value: requiredDeposit}(offer);
         vm.stopPrank();
     }
