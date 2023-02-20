@@ -2,7 +2,6 @@
 pragma solidity ^0.8.16;
 
 import "./BionetTypes.sol";
-import "./BionetConstants.sol";
 
 import {FundsLib} from "./libs/FundsLib.sol";
 import {IBionetRouter} from "./interfaces/IBionetRouter.sol";

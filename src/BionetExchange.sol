@@ -127,6 +127,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     /// @dev Only the buyer can cancel.  Doing so is a penalty.  This
     /// will release funds and emit an event.  Cancel also happens if
     /// the 'redeemBy' timer expires.
+    ///
     /// Will revert if:
     ///  - Caller is not the router
     ///  - Exchange doesn't exist
@@ -164,6 +165,11 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     /// @dev Called by seller to revoke a committment. Also checks
     /// redeem timer and may cancel versus revoke if the timer
     /// has expired.  Exchange must be in Committment state.
+    ///
+    /// Note: the seller can also call revoke without penalty
+    /// if the redeem timer has expired. This will cause a cancel
+    //  and the buyer pays the penalty.
+    ///
     /// Emits ExchangeRevoked or ExchangeCanceled
     /// Will revert if:
     ///  - Caller is not the router
@@ -187,8 +193,8 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(_caller == offer.seller, "Exchange: Seller must be the caller");
 
         // check if voucher expired (redeem period)
-        bool voucherExpired = block.timestamp > exchange.redeemBy;
-        if (voucherExpired) {
+        //bool voucherExpired = block.timestamp > exchange.redeemBy;
+        if (redeemPhaseExpired(exchange)) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
             exchange.finalizedDate = block.timestamp;
@@ -240,8 +246,8 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.offerId
         );
 
-        bool voucherExpired = block.timestamp > exchange.redeemBy;
-        if (voucherExpired) {
+        //bool voucherExpired = block.timestamp > exchange.redeemBy;
+        if (redeemPhaseExpired(exchange)) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
             exchange.finalizedDate = block.timestamp;
@@ -278,7 +284,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
      * 1. buyer calls to close -> all good, [completed]
      * 2. dispute timer expires -> [completed]
      *
-     * Therefore any one can call finalize under the following conditions:
+     * Therefore anyone can call finalize under the following conditions:
      * - The buyer is the caller, OR
      * - The dispute timer has expired
      *
@@ -291,11 +297,12 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
     /// @dev Finalize an exchange. This is an important step in the process. It releases funds, and transfers
     /// the IP NFT.  Exchange must be in the 'redeemed' state.
     ///
-    /// Possible scenarios:
-    ///  - buyer calls to close -> [completed] (normal process)
-    ///  - dispute timer expires -> [completed]
-    /// In either case, the exchange will be closed.
+    /// Note: the seller can call finalize if the dispute timer has
+    /// expired to release funds.
+    ///
     /// Emits ExchangeCompleted
+    /// @param _buyer for the exchange
+    /// @param _exchangeId of the exchange
     function finalize(address _buyer, uint256 _exchangeId)
         external
         onlyRouter
@@ -307,43 +314,43 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             exchange.state == BionetTypes.ExchangeState.Redeemed,
             "Exchange: Wrong state. Expected redeemed"
         );
+        require(
+            buyerOrDisputePhaseExpired(_buyer, exchange),
+            "Exchange: buyer must be the caller or dispute phase expired"
+        );
 
-        bool disputeExpired = block.timestamp > exchange.disputeBy;
-        if (_buyer == exchange.buyer || disputeExpired == true) {
-            // wrap it up...
-            BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-                exchange.offerId
-            );
-            exchange.state = BionetTypes.ExchangeState.Completed;
-            exchange.finalizedDate = block.timestamp;
+        // wrap it up...
+        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
+            exchange.offerId
+        );
+        exchange.state = BionetTypes.ExchangeState.Completed;
+        exchange.finalizedDate = block.timestamp;
 
-            // IF the seller removed the approval for the exchange
-            // this will revert.  Which means the seller doesn't
-            // get paid till they approve the exchange for xfer.
-            IERC1155(offer.assetToken).safeTransferFrom(
-                offer.seller,
-                exchange.buyer,
-                offer.assetTokenId,
-                offer.quantityAvailable,
-                ""
-            );
+        // IF the seller removed the approval for the exchange
+        // this will revert.  Which means the seller doesn't
+        // get paid till they approve the exchange for xfer.
+        IERC1155(offer.assetToken).safeTransferFrom(
+            offer.seller,
+            exchange.buyer,
+            offer.assetTokenId,
+            offer.quantityAvailable,
+            ""
+        );
 
-            finalizeCommittment(
-                exchange.id,
-                offer.seller,
-                exchange.buyer,
-                offer.price,
-                exchange.state
-            );
+        finalizeCommittment(
+            exchange.id,
+            offer.seller,
+            exchange.buyer,
+            offer.price,
+            exchange.state
+        );
 
-            emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
-        } else {
-            revert("Exchange: Cannot be finalized");
-        }
+        emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
     }
 
     /// @dev Withdraw funds (ether). Funds can only be withdrawn
     /// if they are release by the protocol.
+    /// @param _account to withdraw from
     function withdraw(address _account) external onlyRouter {
         uint256 amt = ExchangeStorage.withdraw(_account);
         if (amt > 0) {
@@ -454,5 +461,25 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             emit ReleaseEscrow(_seller, avail);
             emit FeeCollected(_exchangeId, fee);
         }
+    }
+
+    /// @dev helper to check for redeem expiration (commit phase)
+    function redeemPhaseExpired(BionetTypes.Exchange memory _exchange)
+        internal
+        view
+        returns (bool result)
+    {
+        result = block.timestamp > _exchange.redeemBy;
+    }
+
+    /// @dev helper to check for dispute expiration (after redeem).
+    /// check is the caller is the buyer OR the timer has expired.
+    function buyerOrDisputePhaseExpired(
+        address _buyer,
+        BionetTypes.Exchange memory _exchange
+    ) internal view returns (bool result) {
+        result =
+            _exchange.buyer == _buyer ||
+            block.timestamp > _exchange.disputeBy;
     }
 }
