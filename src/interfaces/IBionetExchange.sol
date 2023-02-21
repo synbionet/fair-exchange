@@ -79,7 +79,13 @@ interface IBionetExchange {
     /// Usually happens at an end state in the protocol.
     /// @param account of the exchange withdraw from
     /// @param amount withdrawn
-    event Withdraw(address account, uint256 amount);
+    event Withdraw(address indexed account, uint256 amount);
+
+    /// @dev Emitted when a withdraw is attempted but ther are
+    /// no funds available to withdraw.
+    /// @param account of the exchange withdraw from
+    /// @param amount withdrawn
+    event FundsNotAvailable(address indexed account, uint256 amount);
 
     /// @dev Emitted when funds are released from escrow
     /// and available to withdraw.

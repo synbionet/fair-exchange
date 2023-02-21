@@ -193,7 +193,6 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(_caller == offer.seller, "Exchange: Seller must be the caller");
 
         // check if voucher expired (redeem period)
-        //bool voucherExpired = block.timestamp > exchange.redeemBy;
         if (redeemPhaseExpired(exchange)) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
@@ -245,8 +244,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
             exchange.offerId
         );
+        // Check buyer still owns the voucher....
+        uint256 vb = IBionetVoucher(voucherAddress).balanceOf(_buyer);
+        require(vb > 0, "Exchange: Buyer no longer owns the voucher to redeem");
 
-        //bool voucherExpired = block.timestamp > exchange.redeemBy;
         if (redeemPhaseExpired(exchange)) {
             // treat as a cancel. Buyer pays the penalty
             exchange.state = BionetTypes.ExchangeState.Canceled;
@@ -273,26 +274,6 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
             emit ExchangeRedeemed(offer.id, exchange.id, offer.seller);
         }
     }
-
-    /**
-     * @dev Finalize an exchange.
-     *
-     * This is an important step in the process. It releases funds, and transfers
-     * the IP NFT.  Exchange must be in the 'redeemed' state
-     *
-     * Possible scenarios:
-     * 1. buyer calls to close -> all good, [completed]
-     * 2. dispute timer expires -> [completed]
-     *
-     * Therefore anyone can call finalize under the following conditions:
-     * - The buyer is the caller, OR
-     * - The dispute timer has expired
-     *
-     * In either case, the exchange will be closed.
-     *
-     * Emits event on successful close
-     * Will revert if caller is not the buyer and the time has not expired
-     */
 
     /// @dev Finalize an exchange. This is an important step in the process. It releases funds, and transfers
     /// the IP NFT.  Exchange must be in the 'redeemed' state.
@@ -356,6 +337,8 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         if (amt > 0) {
             payable(_account).sendValue(amt);
             emit Withdraw(_account, amt);
+        } else {
+            emit FundsNotAvailable(_account, amt);
         }
     }
 
@@ -395,9 +378,7 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
 
     /** Internal */
 
-    /**
-     * Burns voucher and release funds based on the exchange state
-     */
+    /// @dev Burns voucher and release funds based on the exchange state
     function finalizeCommittment(
         uint256 _exchangeId,
         address _seller,
