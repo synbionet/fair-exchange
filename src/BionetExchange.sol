@@ -1,466 +1,333 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.13;
 
-import "./BionetTypes.sol";
-import "./BionetConstants.sol";
-import {FundsLib} from "./libs/FundsLib.sol";
-import {ExchangeStorage} from "./libs/ExchangeStorageLib.sol";
-import {IBionetVoucher} from "./interfaces/IBionetVoucher.sol";
-import {IBionetExchange} from "./interfaces/IBionetExchange.sol";
+import {IConfig} from "./interfaces/IConfig.sol";
+import {IExchange} from "./interfaces/IExchange.sol";
+import {ITreasury} from "./interfaces/ITreasury.sol";
+import {BionetExchangeStorage} from "./BionetExchangeStorage.sol";
+import {IExchangeFactory} from "./interfaces/IExchangeFactory.sol";
 
 import {Address} from "openzeppelin/utils/Address.sol";
-import {IERC1155} from "openzeppelin/token/ERC1155/IERC1155.sol";
-import {ReentrancyGuard} from "openzeppelin/security/ReentrancyGuard.sol";
 
-/// @dev Core logic of Bionet. Calls trigger state transistions
-/// related to exchanges.  Where an exchange is committment
-/// to an offer between a buyer and seller.
-contract BionetExchange is IBionetExchange, ReentrancyGuard {
+/// @dev An implementation of a fair exchange state machine.
+/// Represents a contract between two parties that are agreeing to 'terms'.
+/// One of the goals of the contract is to incentivize parties to follow
+/// the contract through rewards/penalties. Expiration timers are used
+/// to help ensure the protocol is not locked in a state due to a single parties actions.
+/// Timers are also used to give time to parties to coordinate activities
+/// off-chain.
+contract BionetExchange is IExchange, BionetExchangeStorage {
     using Address for address payable;
 
-    // Address of the Router
-    address routerAddress;
-    // Address of the Voucher
-    address voucherAddress;
-
-    // msg.sender must be the address of the router
-    modifier onlyRouter() {
-        require(
-            msg.sender == routerAddress,
-            "Exchange: can only be called by the router"
-        );
-        _;
+    function config() public view returns (address configAddress) {
+        configAddress = IExchangeFactory(factory).config();
     }
 
-    /// @dev Called right after constructor with address of
-    /// dependency contracts.
-    function initialize(address _router, address _voucher) external {
-        routerAddress = _router;
-        voucherAddress = _voucher;
-    }
-
-    /// @dev Called by a seller to create a new Offer.
-    /// Each Offer has an id and associated information.
-    /// Emits OfferCreated
-    /// Will revert if:
-    ///  - Caller is not the router
-    /// Additional validation done at the router
-    function createOffer(BionetTypes.Offer memory _offer)
-        external
-        payable
-        onlyRouter
-        returns (uint256)
-    {
-        // Create the Offer with an ID
-        uint256 oid = ExchangeStorage.nextOfferId();
-        _offer.id = oid;
-        ExchangeStorage.entities().offers[oid] = _offer;
-
-        // Move the funds sent with the transaction into
-        // the seller's escrow
-        ExchangeStorage.deposit(_offer.seller, msg.value);
-
-        emit OfferCreated(oid, _offer.seller, _offer);
-        return oid;
-    }
-
-    /// @dev Sets the offer as voided, which should 'de-list' it on
-    /// the market. Emits OfferVoided
-    /// Will revert if:
-    ///  - Caller is not the router
-    ///  - Caller is not the seller listed in the offer
-    function voidOffer(address _caller, uint256 _offerId) external onlyRouter {
-        BionetTypes.Offer storage offer = ExchangeStorage.fetchValidOffer(
-            _offerId
-        );
-        require(_caller == offer.seller, "Exchange: caller must be the seller");
-        offer.voided = true;
-
-        emit OfferVoided(_offerId, _caller);
-    }
-
-    /// @dev Creates an Exchange between the buyer and seller. Escrows funds.
-    /// Issues a voucher to the buyer. Emits OfferCommitted.
-    /// Will revert if:
-    ///  - Caller is not the router
-    ///  - Offer doesn't exist
-    ///  - Offer has been voided
-    ///  - The buyer doesn't send enough money for the price of the offer
-    function commit(address _buyer, uint256 _offerId)
-        external
-        payable
-        onlyRouter
-        returns (uint256)
-    {
-        // check the offer exists and is not voided. You cannot commit
-        // to voided Offers
-        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-            _offerId
-        );
-        require(
-            msg.value >= offer.price,
-            "Exchange: Value sent must be >= price"
-        );
-
-        // create the exchange with a new ID
-        uint256 eid = ExchangeStorage.nextExchangeId();
-        (, BionetTypes.Exchange storage exchange) = ExchangeStorage
-            .fetchExchange(eid);
-
-        exchange.id = eid;
-        exchange.offerId = _offerId;
-        exchange.buyer = _buyer;
-        exchange.redeemBy = block.timestamp + WEEK; // Set the redeem timer
-        exchange.state = BionetTypes.ExchangeState.Committed;
-
-        // escrow funds
-        ExchangeStorage.deposit(_buyer, msg.value);
-
-        // issue token to buyer
-        IBionetVoucher(voucherAddress).issueVoucher(_buyer, eid);
-
-        // emit event
-        emit ExchangeCreated(_offerId, eid, _buyer);
-        return eid;
-    }
-
-    /// @dev Only the buyer can cancel.  Doing so is a penalty.  This
-    /// will release funds and emit an event.  Cancel also happens if
-    /// the 'redeemBy' timer expires.
+    /// @dev Initialize a new Exchange with terms between a buyer and seller.
+    /// Should be called by the factory.
     ///
-    /// Will revert if:
-    ///  - Caller is not the router
-    ///  - Exchange doesn't exist
-    ///  - Exchange is NOT in the committed state
-    ///  - Caller is not the exchange buyer
-    function cancel(address _buyer, uint256 _exchangeId) external onlyRouter {
-        BionetTypes.Exchange storage exchange = ExchangeStorage
-            .fetchValidExchange(_exchangeId);
-        require(_buyer == exchange.buyer, "Exchange: Caller must be the buyer");
-        require(
-            exchange.state == BionetTypes.ExchangeState.Committed,
-            "Exchange: Wrong state. Expected committed"
-        );
+    /// Reverts if:
+    /// * There's a zero address for seller, buyer, or asset
+    /// * Sender did not send the required seller's deposit
+    ///
+    /// @param _factory that created me
+    /// @param _seller creating the exchange
+    /// @param _buyer in the exchange
+    /// @param _asset the seller is offering
+    /// @param _terms an array of uint256 values:
+    ///         [0]: tokenId of the asset offered
+    ///         [1]: price
+    ///         [2]: the seller's deposit (may be 0)
+    ///         [3]: the buyer's penalty (may be 0)
+    ///
+    /// Note: Factory validates input before creating the Exchange.
+    ///
+    function initialize(
+        address _factory,
+        address payable _seller,
+        address payable _buyer,
+        address _asset,
+        uint256[4] memory _terms
+    ) external payable {
+        seller = _seller;
+        buyer = _buyer;
+        asset = _asset;
 
-        // It doesn't matter if the voucher expired or not, still canceling...
-        // as the fee is the same
-        exchange.state = BionetTypes.ExchangeState.Canceled;
-        exchange.finalizedDate = block.timestamp;
+        assetTokeId = _terms[0];
+        price = _terms[1];
+        sellerDeposit = _terms[2];
+        buyerPenalty = _terms[3];
 
-        // Get some information from the offer needed to finalize.
-        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-            exchange.offerId
-        );
-        finalizeCommittment(
-            exchange.id,
-            offer.seller,
-            exchange.buyer,
-            offer.price,
-            exchange.state
-        );
+        // escrow sellers funds
+        balanceOf[seller] = sellerDeposit;
+        totalEscrow += sellerDeposit;
 
-        emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, false);
+        commitBy = ONE_WEEK; // TODO: make configurable?
+        currentState = State.Init;
+        isAvailableToWithdraw = false; // being explicit
+
+        factory = _factory;
     }
 
-    /// @dev Called by seller to revoke a committment. Also checks
-    /// redeem timer and may cancel versus revoke if the timer
-    /// has expired.  Exchange must be in Committment state.
-    ///
-    /// Note: the seller can also call revoke without penalty
-    /// if the redeem timer has expired. This will cause a cancel
-    //  and the buyer pays the penalty.
-    ///
-    /// Emits ExchangeRevoked or ExchangeCanceled
-    /// Will revert if:
-    ///  - Caller is not the router
-    ///  - Exchange doesn't exist
-    ///  - Exchange is NOT in the committed state
-    ///  - Caller is not the seller
-    function revoke(address _caller, uint256 _exchangeId)
-        external
-        onlyRouter
-        nonReentrant
-    {
-        BionetTypes.Exchange storage exchange = ExchangeStorage
-            .fetchValidExchange(_exchangeId);
-        require(
-            exchange.state == BionetTypes.ExchangeState.Committed,
-            "Exchange: Wrong state. Expected committed"
-        );
-        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-            exchange.offerId
-        );
-        require(_caller == offer.seller, "Exchange: Seller must be the caller");
+    // ***
+    // External
+    // ***
 
-        // check if voucher expired (redeem period)
-        if (redeemPhaseExpired(exchange)) {
-            // treat as a cancel. Buyer pays the penalty
-            exchange.state = BionetTypes.ExchangeState.Canceled;
-            exchange.finalizedDate = block.timestamp;
+    /// @dev Buyer commits to the terms starting the process and
+    /// the redemption period timer.
+    function commit() external payable onlyBuyer isValidState(State.Init) {
+        // Check if the buyer has commited to the deal within the
+        // required time, otherwise the deal expires; seller gets
+        // their deposit back, buyer is refunded msg.value.
+        if (_commitByTimerExpired()) {
+            finalizedDate = block.timestamp;
+            currentState = State.Expired;
+            _releaseEscrow();
 
-            finalizeCommittment(
-                exchange.id,
-                offer.seller,
-                exchange.buyer,
-                offer.price,
-                exchange.state
-            );
+            payable(msg.sender).sendValue(msg.value);
 
-            emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, true);
+            emit Expired(address(this), block.timestamp);
+            emit ReleasedFunds(address(this));
         } else {
-            exchange.state = BionetTypes.ExchangeState.Revoked;
-            exchange.finalizedDate = block.timestamp;
+            uint256 buyerTotal = price + buyerPenalty;
+            require(msg.value >= buyerTotal, "Exchange: Wrong deposit amount");
 
-            finalizeCommittment(
-                exchange.id,
-                offer.seller,
-                exchange.buyer,
-                offer.price,
-                exchange.state
-            );
+            // set buyers escrow
+            balanceOf[buyer] = buyerTotal;
+            totalEscrow += buyerTotal;
 
-            emit ExchangeRevoked(offer.id, _exchangeId, _caller);
+            // Update state and start redeem timer
+            currentState = State.Committed;
+            redeemBy = block.timestamp + ONE_WEEK;
+
+            emit Committed(address(this), block.timestamp);
         }
     }
 
-    /// @dev Called by buyer to redeem a voucher issued during commit phase.
-    /// If the voucher expired it's canceled by the protocol and
-    /// the buyer pays a penalty.  Otherwise we update state, burn the
-    /// voucher and start the dispute time.
-    /// Emits ExchangeRedeemed or ExchangeCanceled.
-    /// Will revert if:
-    ///  - Caller is not the router
-    ///  - Exchange doesn't exist
-    ///  - Exchange is NOT in the committed state
-    ///  - Caller is not the buyer
-    function redeem(address _buyer, uint256 _exchangeId) external onlyRouter {
-        BionetTypes.Exchange storage exchange = ExchangeStorage
-            .fetchValidExchange(_exchangeId);
-        require(
-            exchange.state == BionetTypes.ExchangeState.Committed,
-            "Exchange: Wrong state. Expected committed"
-        );
-        require(exchange.buyer == _buyer, "Exchange: buyer must be the caller");
-        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-            exchange.offerId
-        );
-        // Check buyer still owns the voucher....
-        uint256 vb = IBionetVoucher(voucherAddress).balanceOf(_buyer);
-        require(vb > 0, "Exchange: Buyer no longer owns the voucher to redeem");
+    /// @dev Buyer can cancel the deal. This may result in a penalty
+    /// to the buyer depending on the terms
+    function cancel() external onlyBuyer isValidState(State.Committed) {
+        // Ignore the timer here. Outcome is the same
+        _cancelInternal();
+    }
 
-        if (redeemPhaseExpired(exchange)) {
-            // treat as a cancel. Buyer pays the penalty
-            exchange.state = BionetTypes.ExchangeState.Canceled;
-            exchange.finalizedDate = block.timestamp;
-
-            finalizeCommittment(
-                exchange.id,
-                offer.seller,
-                exchange.buyer,
-                offer.price,
-                exchange.state
-            );
-
-            emit ExchangeCanceled(offer.id, exchange.id, exchange.buyer, true);
+    /// @dev Seller may revoke the deal. This may result in a penalty
+    /// to the seller depending on the agreed upon terms.
+    function revoke() external onlySeller isValidState(State.Committed) {
+        // If the timer expired and the seller is trying to revoke,
+        // we cancel it. Because the buyer has done nothing, they pay the penalty.
+        if (_redeemByTimerExpired()) {
+            _cancelInternal();
         } else {
-            // Move to the redeemed state
-            exchange.state = BionetTypes.ExchangeState.Redeemed;
-            // Start the dispute timer
-            exchange.disputeBy = block.timestamp + WEEK;
+            currentState = State.Revoked;
+            finalizedDate = block.timestamp;
 
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(exchange.id);
+            _releaseEscrow();
 
-            emit ExchangeRedeemed(offer.id, exchange.id, offer.seller);
+            emit Revoked(address(this), block.timestamp);
+            emit ReleasedFunds(address(this));
         }
     }
 
-    /// @dev Finalize an exchange. This is an important step in the process. It releases funds, and transfers
-    /// the IP NFT.  Exchange must be in the 'redeemed' state.
-    ///
-    /// Note: the seller can call finalize if the dispute timer has
-    /// expired to release funds.
-    ///
-    /// Emits ExchangeCompleted
-    /// @param _buyer for the exchange
-    /// @param _exchangeId of the exchange
-    function finalize(address _buyer, uint256 _exchangeId)
-        external
-        onlyRouter
-        nonReentrant
-    {
-        BionetTypes.Exchange storage exchange = ExchangeStorage
-            .fetchValidExchange(_exchangeId);
-        require(
-            exchange.state == BionetTypes.ExchangeState.Redeemed,
-            "Exchange: Wrong state. Expected redeemed"
-        );
-        require(
-            buyerOrDisputePhaseExpired(_buyer, exchange),
-            "Exchange: buyer must be the caller or dispute phase expired"
-        );
+    /// @dev Called by the buyer to redeem to contract.  Redeem
+    /// is use to signal to the seller the buyer is ready to receive
+    /// the product.  It also start the dispute timer.  During this
+    /// time the buyer may 'complete' the deal, or dispute it.
+    function redeem() external onlyBuyer isValidState(State.Committed) {
+        // If the buyer waited to long they pay the penalty. And the deal
+        // is canceled
+        if (_redeemByTimerExpired()) {
+            _cancelInternal();
+        } else {
+            currentState = State.Redeemed;
+            disputeBy = block.timestamp + ONE_WEEK;
 
-        // wrap it up...
-        BionetTypes.Offer memory offer = ExchangeStorage.fetchValidOffer(
-            exchange.offerId
-        );
-        exchange.state = BionetTypes.ExchangeState.Completed;
-        exchange.finalizedDate = block.timestamp;
-
-        // IF the seller removed the approval for the exchange
-        // this will revert.  Which means the seller doesn't
-        // get paid till they approve the exchange for xfer.
-        IERC1155(offer.assetToken).safeTransferFrom(
-            offer.seller,
-            exchange.buyer,
-            offer.assetTokenId,
-            offer.quantityAvailable,
-            ""
-        );
-
-        finalizeCommittment(
-            exchange.id,
-            offer.seller,
-            exchange.buyer,
-            offer.price,
-            exchange.state
-        );
-
-        emit ExchangeCompleted(offer.id, exchange.id, block.timestamp);
+            emit Redeemed(address(this), block.timestamp);
+        }
     }
 
-    /// @dev Withdraw funds (ether). Funds can only be withdrawn
-    /// if they are release by the protocol.
-    /// @param _account to withdraw from
-    function withdraw(address _account) external onlyRouter {
-        uint256 amt = ExchangeStorage.withdraw(_account);
+    /// @dev Called by the buyer to close the deal. Meaning everyone
+    /// is happy.  The buyer got the product and the seller is paid.
+    /// Both parties will be refunded for and deposits they made.
+    /// The seller will pay a fee to the protocol for the proceeds
+    /// of the sale.  If the buyer does nothing during the dispute
+    /// timer the protocol automatically moves to this state.
+    function complete() external onlyBuyer isValidState(State.Redeemed) {
+        // Ignore the timer here, outcome is the same.
+        _completeInternal();
+    }
+
+    /// @dev Seller can call this to trigger timers if nothing has happened.
+    /// This is a safety mechanism to in the event the buyer does nothing.
+    /// Smart Contracts timers are only activatied by external transactions.
+    function triggerTimer() external onlySeller {
+        if (currentState == State.Init && _commitByTimerExpired()) {
+            finalizedDate = block.timestamp;
+            currentState = State.Expired;
+            _releaseEscrow();
+            emit Expired(address(this), block.timestamp);
+            emit ReleasedFunds(address(this));
+        } else if (currentState == State.Committed && _redeemByTimerExpired()) {
+            _cancelInternal();
+        } else if (currentState == State.Redeemed && _disputeByTimerExpired()) {
+            _completeInternal();
+        }
+    }
+
+    /// TODO:
+    function dispute() external onlyBuyer {}
+
+    /// @dev Withdraw funds. Can be called by either the buyer or seller
+    /// to withdraw and funds escrowed.  Funds are only released by the
+    /// protocol based on the current state.
+    function withdraw() external buyerOrSeller {
+        require(
+            isAvailableToWithdraw,
+            "Exchange: Funds are not yet available to withdraw"
+        );
+        uint256 amt = balanceOf[msg.sender];
         if (amt > 0) {
-            payable(_account).sendValue(amt);
-            emit Withdraw(_account, amt);
-        } else {
-            emit FundsNotAvailable(_account, amt);
+            balanceOf[msg.sender] = 0;
+            totalEscrow -= amt;
+            payable(msg.sender).sendValue(amt);
         }
+        emit WithdrawFunds(address(this), msg.sender, amt);
     }
 
-    /** Views **/
-
-    /// @dev Get an Offer by ID
-    function getOffer(uint256 _offerId)
-        public
-        view
-        returns (bool exists, BionetTypes.Offer memory offer)
-    {
-        (exists, offer) = ExchangeStorage.fetchOffer(_offerId);
-    }
-
-    /// @dev Get an Exchange by ID
-    function getExchange(uint256 _exchangeId)
-        public
-        view
-        returns (bool exists, BionetTypes.Exchange memory exchange)
-    {
-        (exists, exchange) = ExchangeStorage.fetchExchange(_exchangeId);
-    }
-
-    /// @dev Return the escrow balance of 'account'
-    function getEscrowBalance(address _account)
+    /// @dev What's the escrow balance of the 'account'
+    function escrowBalance(address _account)
         external
         view
         returns (uint256 bal)
     {
-        bal = ExchangeStorage.funds().escrow[_account];
+        bal = balanceOf[_account];
     }
 
-    /// @dev Return the protocol balance
-    function getProtocolBalance() external view returns (uint256 bal) {
-        bal = ExchangeStorage.funds().fees;
+    // ***
+    // Guards
+    // ***
+
+    modifier onlyBuyer() {
+        require(msg.sender == buyer, "Exchange: expected the buyer");
+        _;
     }
 
-    /** Internal */
+    modifier onlySeller() {
+        require(msg.sender == seller, "Exchange: expected the seller");
+        _;
+    }
 
-    /// @dev Burns voucher and release funds based on the exchange state
-    function finalizeCommittment(
-        uint256 _exchangeId,
-        address _seller,
-        address _buyer,
-        uint256 _price,
-        BionetTypes.ExchangeState _state
+    modifier buyerOrSeller() {
+        bool ok = msg.sender == buyer || msg.sender == seller;
+        require(ok, "Exchange: expected the buyer or seller");
+        _;
+    }
+
+    modifier isValidState(State _expected) {
+        require(
+            currentState == _expected,
+            "Exchange: Invalid call for the current state"
+        );
+        _;
+    }
+
+    // ***
+    // Internal stuff
+    // ***
+
+    function _commitByTimerExpired() internal view returns (bool expired) {
+        expired = block.timestamp > commitBy;
+    }
+
+    function _redeemByTimerExpired() internal view returns (bool expired) {
+        expired = block.timestamp > redeemBy;
+    }
+
+    function _disputeByTimerExpired() internal view returns (bool expired) {
+        expired = block.timestamp > disputeBy;
+    }
+
+    /// @dev Cancel logic is used in a few states including trigger
+    function _cancelInternal() internal {
+        currentState = State.Canceled;
+        finalizedDate = block.timestamp;
+        _releaseEscrow();
+        emit Canceled(address(this), block.timestamp);
+        emit ReleasedFunds(address(this));
+    }
+
+    /// @dev Complete logic is used in state and timer
+    function _completeInternal() internal {
+        currentState = State.Completed;
+        finalizedDate = block.timestamp;
+
+        _releaseEscrow();
+
+        // TODO: Transfer the 1155?
+
+        // Pay the protocol fee
+        if (feeCollected > 0) {
+            address t = IConfig(config()).getTreasury();
+            ITreasury(t).deposit{value: feeCollected}();
+        }
+
+        emit Completed(address(this), block.timestamp);
+        emit ReleasedFunds(address(this));
+    }
+
+    /// @dev Move escrow between accounts
+    function _transfer(
+        address _from,
+        address _to,
+        uint256 _amount
     ) internal {
-        if (_state == BionetTypes.ExchangeState.Canceled) {
-            // Canceled by buyer or protocol timeout
-            // Calculate fee
-            uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
-
-            ExchangeStorage.transfer(_buyer, _seller, fee);
-
-            // Buyer penalty
-            uint256 refundLessPenalty = _price - fee;
-
-            // Update amount available to withdraw
-            // Seller gets the penalty fee
-            ExchangeStorage.funds().availableToWithdraw[_seller] += fee;
-            // Buyer gets price - fee back
-            ExchangeStorage.funds().availableToWithdraw[
-                _buyer
-            ] += refundLessPenalty;
-
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
-
-            emit ReleaseEscrow(_seller, fee);
-            emit ReleaseEscrow(_buyer, refundLessPenalty);
-        }
-        if (_state == BionetTypes.ExchangeState.Revoked) {
-            // by seller
-            uint256 fee = FundsLib.calculateFee(_price, CANCEL_REVOKE_FEE);
-            // increase buyers escrow by 'fee'
-            ExchangeStorage.transfer(_seller, _buyer, fee);
-            // Seller penalty
-            uint256 refundPlusPenalty = _price + fee;
-
-            ExchangeStorage.funds().availableToWithdraw[
-                _buyer
-            ] += refundPlusPenalty;
-
-            // burn the voucher
-            IBionetVoucher(voucherAddress).burnVoucher(_exchangeId);
-
-            emit ReleaseEscrow(_buyer, refundPlusPenalty);
-        }
-        if (_state == BionetTypes.ExchangeState.Completed) {
-            // all good
-            uint256 fee = FundsLib.calculateFee(_price, PROTOCOL_FEE);
-
-            // Buyer pays the seller
-            ExchangeStorage.transfer(_buyer, _seller, _price);
-            // Seller pays protocol fee
-            ExchangeStorage.transferFee(_seller, fee);
-
-            uint256 avail = _price - fee;
-            ExchangeStorage.funds().availableToWithdraw[_seller] += avail;
-
-            emit ReleaseEscrow(_seller, avail);
-            emit FeeCollected(_exchangeId, fee);
-        }
+        require(balanceOf[_from] >= _amount, "Exchange: Insufficient funds");
+        balanceOf[_from] -= _amount;
+        balanceOf[_to] += _amount;
     }
 
-    /// @dev helper to check for redeem expiration (commit phase)
-    function redeemPhaseExpired(BionetTypes.Exchange memory _exchange)
-        internal
-        view
-        returns (bool result)
-    {
-        result = block.timestamp > _exchange.redeemBy;
-    }
+    /// @dev Logic responsible for releasing escrow for withdraw.
+    /// Releasing funds is dependent on the state of the contract.
+    ///
+    /// This is the place in the code where this is calculated. It only
+    /// changes state - no external interaction
+    function _releaseEscrow() internal {
+        if (currentState == State.Expired) {
+            // The buyer did not commit to the deal
+            // within the required time. Allow parties to
+            // withdraw whatever they escrowed.
+            isAvailableToWithdraw = true;
+        } else if (currentState == State.Canceled) {
+            // Buyer canceled or the redeemBy timer expired
+            // seller gets: buyerPenalty + their deposit
+            // buyer gets: price
+            _transfer(buyer, seller, buyerPenalty);
+            isAvailableToWithdraw = true;
+        } else if (currentState == State.Revoked) {
+            // Seller revoked the deal
+            // seller gets: 0
+            // buyer gets : sellerDeposit + whatever they escrowed
+            if (sellerDeposit > 0) {
+                _transfer(seller, buyer, sellerDeposit);
+            }
+            isAvailableToWithdraw = true;
+        } else if (currentState == State.Completed) {
+            // Buyer completed or the disputeBy timer expired
+            // seller gets: price + their deposits - protocol fee
+            // buyer gets : buyerDeposit
 
-    /// @dev helper to check for dispute expiration (after redeem).
-    /// check is the caller is the buyer OR the timer has expired.
-    function buyerOrDisputePhaseExpired(
-        address _buyer,
-        BionetTypes.Exchange memory _exchange
-    ) internal view returns (bool result) {
-        result =
-            _exchange.buyer == _buyer ||
-            block.timestamp > _exchange.disputeBy;
+            // Calculate protocol free
+            uint256 fee = IConfig(config()).calculateProtocolFee(price);
+
+            // transfer 'price' to seller.
+            // This leaves an additional buyerPenalty deposit
+            // available for the buyer to withdraw
+            _transfer(buyer, seller, price);
+
+            // Deduct protocol fee from seller
+            balanceOf[seller] -= fee;
+            feeCollected = fee;
+            isAvailableToWithdraw = true;
+        }
     }
 }

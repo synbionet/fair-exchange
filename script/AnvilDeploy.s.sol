@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
+/*
 import "../src/BionetRouter.sol";
 import "../src/BionetExchange.sol";
 import "../src/BionetVoucher.sol";
+*/
 
 import "forge-std/Script.sol";
 import "forge-std/console2.sol";
@@ -16,6 +18,7 @@ contract AnvilDeployScript is Script {
         0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
     function run() public {
+        /*
         vm.startBroadcast(OWNER_PRIV_KEY);
 
         // Deploy contracts
@@ -38,5 +41,6 @@ contract AnvilDeployScript is Script {
         console.log("router:   %s", rA);
         console.log("voucher:  %s", vA);
         console.log("exchange: %s", eA);
+        */
     }
 }
