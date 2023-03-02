@@ -80,14 +80,14 @@ An exchange can work if proper rewards and penalties are in place.  Without them
 
 ## Possible financial impact of final states
 
-Of course, this depends on the amount of seller/buyer deposits agreed upon 
+The chart below depends on the amount of seller/buyer deposits agreed upon 
 at the beginning of the exchange.
 
 * **-1** loss
 * **+1** gain
 * **0**  nothing gained/nothing lost
 
-Rough guideline as starting place for more thinking on the process.
+`Completed` is the happy path - everyone gains/wins.
 
 | State of an exchange | Seller     | Buyer       | Protocol |
 | -------------------- | ---------- | ----------- | -------- |
