@@ -1,91 +1,151 @@
 # Fair Exchange
+Fair Exchange is a protocol to enable a p2p marketplace for Synthetic Biology (SynBio) services. For the most part, the protocol is an escrow service that ensures fees and assets are distributed as expected to the parties involved in an exchange. It uses incentives to encourage participants to follow the rules of the system to enforce atomic exchanges where *either both parties get what they expect, or none do*.
 
-## What is it?
-Fair Exchange is a protocol to enable the exchange of goods and services on the Bionet. Overall, you can think of it as an escrow service, or trusted "middle-man", that ensures fees and assets are distributed as expected to the parties involved in an exchange. It uses incentives to encourage participants to follow the rules of the system to enforce atomic exchanges where *either both parties get what they expect, or none do*.
+This work is inspired by the [Boson protocol](https://www.bosonprotocol.io/technology/) and other research related to "fair exchange".
 
-Our current effort is focused on a minimal viable product (MVP).  We're intentionally keeping the core logic as simple as possible as we work through the needs of the Synthetic Biology (SynBio) community.  
+## Challenge
+The majority of SynBio services produce physical products. Tracking physical products with smart contracts leads to the [Oracle problem](https://blog.chain.link/what-is-the-blockchain-oracle-problem/).  Smart contracts are able to see all things on-chain and verify if something happened.  But they can't see things off-chain. So they must rely on something else to tell them about the exchange.
 
-This work is **heavily** inspired by the great work on the [Boson protocol](https://www.bosonprotocol.io/technology/) and other research related to "fair exchange". We are adapting/extending some of Boson's concepts to support IP NFTS and the unique needs of the Bionet. We may transition to the Boson protocol in the future.
+For example how does a smart contract know if:
+* the product is what the buyer expected
+* the service provider shipped the product
+* the buyer received it
+* the carrier lost it or delivered to the wrong person
+* the product was damaged
+
+We can have the parties to the exchange answer these questions.  But what if they're malicious or abort the exchange?  This could lead to the loss funds and a lack of trust in the system.
+
+The goal of this work is find the right balance of incentives to minimize or overcome the Oracle problem. 
 
 ## Design
-There are 3 main actors in the protocol: **buyer**, **seller**, and the **exchange**. A buyer and seller may want to exchange both digital and physical assets. The exchange contains the core logic and state machine. A state machine ensures the buyer and seller follow the rules of the system. Each state dictates the rewards and penalities that may impact the exchange.  The goal is to incentive participants to follow the rules.  And by following the rules, both parties get what they want, which helps to build trust in the system over time.
+There are 3 main actors in the protocol: **buyer**, **seller**, and the **exchange**. A seller provides a service that produces "something". A buyer wants that "somethign" The exchange contains the core logic and a state machine. The goal of the state machine is to ensure the buyer and seller follow the rules of the system. Each state dictates the rewards and potential penalities that may impact the exchange.  The goal is to incentive participants to follow the rules.  And by following the rules, both parties get what they want, which helps to build trust in the system over time.
 
-Buyers and sellers may exchange digital or physical assets (often referred to as *"phygitals"*), or a service.  The current state of SynBio often requires off-chain negotiation related to an exchange which can be time consuming. The protocol takes this into consideration and is being designed to help encourage participants to keep moving forward (through states) until the exchange is finalized.
+The current state of SynBio often requires off-chain negotiation related to an exchange which can be time consuming. The protocol takes this into consideration and is being designed to help encourage participants to keep moving forward (through states) until the exchange is finalized.
 
-### High-level Flow
-
-There are 6 states in the protocol used by the exchange:
-* Committed: The buyer commits to the terms of the sale and escrows the price of the asset
-* Canceled: The buyer decides to abort the purchase and pays a penalty
-* Revoked: The seller decides to abort the sale and pays a penalty
-* Redeemed: The buyer is ready to receive the asset
-* Disputed: The buyer is not happy with the exchange and files a complaint
-* Completed: The buyer got what they expected. The seller is paid as expected
-
-Example of a successful exchange:
-
-1. The seller lists an asset on the Bionet. The asset is connected to an IP NFT that contains the terms and conditions of the asset.
-2. A buyer decides to purchase the asset - "committing" to the sale by paying the agreed upon price which is escrowed by the exchange. The exchange issues a "redeemable voucher" in the form of an NFT to the buyer.  This is proof the buyer has committed to the sale.
-3. When the buyer is ready for the asset, they redeem the voucher, signalling to the seller to ship or provide the asset to the buyer.
-4. The buyer receives the asset and is happy with it.  They close the exchange which releases the escrowed funds to the seller and transfers the IP NFT to the buyer.
-
-In this scenario, only 3 of the 6 states were needed. The other 3 states are used as safety nets. In reality, exchanges don't alway go as planned.
-
-To deal with the need for off-chain negotiations in SynBio and the potential for things to go wrong, a "grace period" or timer is used in two places by the protocol:
-- When a buyer commits to a purchase they have X amount of time to redeem the voucher.  During this time a seller can revoke the sale (and pay a penalty) or the buyer can decide to cancel the purchase (and pay a penalty).  If neither party does anything, the grace period will expire and the protocol will cancel the sale for them (penalizing the buyer).
-- When the buyer redeems a purchase they have X amount of time to close the sale or dispute it.  Disputing the sale leads to another path (TODO). If they close the sale, it's marked as complete, funds are paid to the seller and the IP NFT is transferred to the buyer.  If the buyer does nothing, the timer expires and the protocol will close the sale.
-
-Overall, this is designed to keep the process moving.  Either the buyer and seller must act or the protocol will act for them.
-
-... updating the diagram ...
+## State Machine
+*...work in progress...*
 
 ```mermaid
 stateDiagram-v2
 [*] --> Initialize: seller
 Initialize --> Expired: timeout
-Expired --> [*]
-Initialize --> Commit: buyer
-Commit --> Cancel: buyer
-Commit --> Cancel: timeout
-Cancel --> [*]
-Commit --> Redeem: buyer
-Redeem --> [*]: timeout
-Redeem --> Completed: buyer
-Completed --> [*]
-Redeem --> Disputed: buyer
-Disputed --> Retract: buyer
-Disputed --> Completed: timeout
-Retract --> [*]
-Disputed --> Resolved
-Resolved --> [*]
+Initialize --> Committed: buyer
 
+Committed --> Canceled: timeout
+Committed --> Canceled: seller
+Committed --> Shipped: seller
+
+Shipped --> Completed: timeout
+Shipped --> Received: buyer
+
+Received --> Completed: timeout
+Received --> Completed: buyer
+Received --> Disputed: buyer
+
+Disputed --> Completed: buyer (retract)
+Disputed --> Split: timeout
+Disputed --> Resolved
+
+
+Expired --> [*]
+Canceled --> [*]
+Completed --> [*]
+Split --> [*]
+Resolved --> [*]
 ```
 
-## Fees
-Fees are used to incentive actors to do the right thing.  For example, a seller is less likely to revoke a sale when they have to pay to do so. 
+### Transition States:
+* `Initialized`: Seller creates a unique exchange with a buyer. Starts a timer. If the buyer doesn't `commit` within the timer, the offer is `expired`.  The seller may or may not have deposited a penalty fee.
+* `Committed`: Buyer excepts the exchange, making a deposit towards the price. A timer is started, representing the time to do the work. Within the timer the seller must `ship` or `cancel`. Seller may pay a penatly for cancel.
+    * **Problem**: what if the work takes longer than expected?
+* `Shipped`: Seller ships the product to the buyer. A timer is started. Representing at least how long it should take for the buyer to receive it. If the timer expires before the buyer `receives`, state moves to `completed` releasing funds to the seller
+    * **Problem**: what if shipping takes longer than expected?
+* `Received`: Called by the buyer indicating they have the product.  A timer is started for the buyer to review the product. Within the timer, the buyer can either `complete` the exchange or `dispute` the order. If the buyer does nothing (timeout), the state is moved to `completed` releasing funds to the seller.
+* `Disputed`: Called by the buyer to signal they have a problem with the order.  A timer is started for the parties to resolve the issue.  The buyer can `retract` the dispute `completing` the exchange and releasing funds. The parties can mutally `resolve` the issue. Or if the parties do nothing (timeout), the contract will divide the funds.
+    * **Problem**: How should the contract divide the funds to prevent the buyer from gaming the process?
 
-The following table outlines the amount paid to each party for a given state.  For the MVP, we are using fixed fees. Fees will be configurable in the future, and most
-likely administered by the Bionet DAO.
-* Revoke/Cancel Fee (**RCF**) = 2% of the sale price
-* Completed Sale Fee (**CF**)  = 3% of the sale price 
+
+### Final states
+Indictates the Exchange is closed
+* `Expired`: Buyer didn't commit to the deal.  Seller gets back any penalty deposits made. 
+* `Canceled`: Seller may pay a penalty to the buyer
+* `Completed`: Happy path.  Funds are release/refunded per the terms
+* `Split`: When parties do nothing the contract decides how to refund parties.
+* `Resolved`: Parties came to an agreement. Funds are released per that agreement.
+
+## Timers/Fees/Penalities
+Timers are used to motivate engagement from the parties in the exchange and to keep the state machine moving forward.  They are the ones assessing what's happening - filling the gap from the Oracle problem. Either the buyer and seller must act or the protocol will act for them.
+
+An exchange can work if proper rewards and penalties are in place.  Without them, an irrational or spiteful party can lock up funds and destroy all trust in the system. More research is needed to find the right balance and incentives.
+
+## Possible penalties
+
+The impact of penalties by party.   
+* **-1** (lose)
+* **+1** (gain)
+
+This is an initial ballpark figure to use as starting place for more thinking on the process.
 
 | State of an exchange | Seller     | Buyer       | Protocol |
 | -------------------- | ---------- | ----------- | -------- |
-| Voided               | 0          | 0           | 0        |
-| Revoked              | -RCF       | price + RCF | 0        |
-| Cancel               | RCF        | price - RCF | 0        |
-| Completed            | price - CF | 0           | CF       |
-| Committed            | 0          | -price      | 0        |
+| Expired              |  0         |  0          |  0       |
+| Canceled             | -1         |  0          | -1       |
+| Completed            | +1         | +1          | +1       |
+| Split                | -1         | -1          | +1       |
+| Resolved             | +1         | +1          | +1       |
 
-Voided is a state we didn't mention earlier. A seller can void a listed asset at any time. This would remove the asset from the market.  However, it does not effect existing sales made on the asset.
 
-* When a buyer **commits** to a sale, they commit **price**. Escrowing it with the exchange.
-* Only a seller can **revoke** a sale. Doing so will cost them **RCF**. This will reward the buyer with **price + RCF**
-* A Buyer can **cancel** a sale. This does the opposite of revoke. Reducing the refund to the buyer by **price - RCF** and rewarding the seller with **RCF**.
-* A **completed** exchange pays a fee to the protocol/network. The seller pays the fee. They will receive **price - CF**. The procotol receives **CF**
 
-The timers mentioned earlier will enforce the same fees.
+## Contracts
 
-## Setup
-- We use [Foundry](https://book.getfoundry.sh/) for development and testing.
-- Current state is for developers only...
+
+```mermaid
+erDiagram
+    Alliance ||--O| Factory: configures
+    Alliance ||--O| Treasury: configures
+    Alliance ||--O| KYB: configures
+    Factory ||--|{ Exchange: creates
+    KYB ||--|{ Users: registers
+    Users ||--|{ Exchange: belong
+    Users ||--|| ReputationToken: hasOne
+    Exchange ||--|| IPToken: hasOne
+``` 
+
+## Sufficiently Decentralized
+
+In a perfect world, an entire application could be built on Web3. But we're not there yet.  A Web3 application needs a UI, and often additional data to populate the UI for the best user-experience. The most practical way to do that today is to host those components on a traditional Web2 stack. True decentralization is hard. But our goal should be to find the best balance possible, so we don't end up with a highly centralized application that just flies a Web3 flag.
+
+Inspired by [this](https://www.varunsrinivasan.com/2022/01/11/sufficient-decentralization-for-social-networks) article, **can we find a balance where two users can engage in a SynBio exchange even if the rest of the network wants to prevent it**?
+
+Looking at the graph below, the goal should be to minimize the amount of data and logic on the Web2 side such that the Web3 can still operate and user have full ownership over key data and functionality.
+
+For example, the Web2 side should collect the minimal information needed for: 
+* The market UI
+* Order/Workflow 
+* Contact information
+
+The rest of the information can come from contract events, and external metadata, such as an NFT's metadata link. In addition users should have the ability to delete their data from Web2 storage if they choose.
+
+A p2p marketplace can be a powerful tool to help boost SynBio innovation and creativity. But only if it can be sufficiently decentralized from the beginning.
+
+
+```mermaid
+graph TD
+    subgraph Web2
+        ui[User Interface]
+        wapp[WebApp]
+        db[Database]
+    end
+    
+    subgraph Web3
+        contract[<center>FairExchange Contracts</center>]
+        events[<center>Events</center>]
+    end
+    
+    ui-.->contract
+    ui-.->wapp[<center>Web App</center>]
+    wapp-.->db
+    contract-.->events
+    events-.->db        
+```
+A p2p marketplace can be a powerful tool to help boost SynBio innovation and creativity. But only if it can be sufficiently decentralized from the beginning.
