@@ -126,9 +126,6 @@ For example, the Web2 side should collect the minimal information needed for:
 
 The rest of the information can come from contract events, and external metadata, such as an NFT's metadata link. In addition users should have the ability to delete their data from Web2 storage if they choose.
 
-A p2p marketplace can be a powerful tool to help boost SynBio innovation and creativity. But only if it can be sufficiently decentralized from the beginning.
-
-
 ```mermaid
 graph TD
     subgraph Web2
