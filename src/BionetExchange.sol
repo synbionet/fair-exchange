@@ -84,10 +84,10 @@ contract BionetExchange is IExchange, BionetExchangeStorage {
             currentState = State.Expired;
             _releaseEscrow();
 
-            payable(msg.sender).sendValue(msg.value);
-
             emit Expired(address(this), block.timestamp);
             emit ReleasedFunds(address(this));
+
+            payable(msg.sender).sendValue(msg.value);
         } else {
             uint256 buyerTotal = price + buyerPenalty;
             require(msg.value >= buyerTotal, "Exchange: Wrong deposit amount");
@@ -189,9 +189,9 @@ contract BionetExchange is IExchange, BionetExchangeStorage {
         if (amt > 0) {
             balanceOf[msg.sender] = 0;
             totalEscrow -= amt;
+            emit WithdrawFunds(address(this), msg.sender, amt);
             payable(msg.sender).sendValue(amt);
         }
-        emit WithdrawFunds(address(this), msg.sender, amt);
     }
 
     /// @dev What's the escrow balance of the 'account'
@@ -263,14 +263,14 @@ contract BionetExchange is IExchange, BionetExchangeStorage {
 
         // TODO: Transfer the 1155?
 
+        emit Completed(address(this), block.timestamp);
+        emit ReleasedFunds(address(this));
+
         // Pay the protocol fee
         if (feeCollected > 0) {
             address t = IConfig(config()).getTreasury();
             ITreasury(t).deposit{value: feeCollected}();
         }
-
-        emit Completed(address(this), block.timestamp);
-        emit ReleasedFunds(address(this));
     }
 
     /// @dev Move escrow between accounts

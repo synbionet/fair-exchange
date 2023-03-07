@@ -19,13 +19,18 @@ contract BionetConfig is IConfig, Ownable {
 
     function setProtocolFee(uint256 _basisPoints) external onlyOwner {
         feeBasisPoints = _basisPoints;
+        emit ProtocolFeeUpdated(feeBasisPoints);
     }
 
-    function setTreasury(address _tres) external onlyOwner {
+    function setTreasury(
+        address _tres
+    ) external onlyOwner noZeroAddress(_tres) {
         treasury = _tres;
     }
 
-    function setExchangeTemplate(address _temp) external onlyOwner {
+    function setExchangeTemplate(
+        address _temp
+    ) external onlyOwner noZeroAddress(_temp) {
         exchangeTemplate = _temp;
     }
 
@@ -53,5 +58,14 @@ contract BionetConfig is IConfig, Ownable {
         uint256 _price
     ) external view returns (uint256 amount) {
         amount = (_price * feeBasisPoints) / 10_000;
+    }
+
+    /// ***
+    /// Internal
+    ///
+
+    modifier noZeroAddress(address _value) {
+        require(_value != address(0x0), "Config: Zero Address");
+        _;
     }
 }

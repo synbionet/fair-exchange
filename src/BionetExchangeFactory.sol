@@ -9,7 +9,7 @@ import {Clones} from "openzeppelin/proxy/Clones.sol";
 
 /// @dev Create an exchange for the seller
 contract BionetExchangeFactory is IExchangeFactory {
-    address public config; /// address of the BionetConfig contract
+    address public immutable config; /// address of the BionetConfig contract
     mapping(address => bool) validExchange;
 
     constructor(address _config) {
@@ -31,11 +31,11 @@ contract BionetExchangeFactory is IExchangeFactory {
 
         address payable sender = payable(msg.sender);
 
+        emit ExchangeCreated(exchangeAddress, sender, _buyer, block.timestamp);
+
         validExchange[
             exchangeAddress = _createInstance(sender, _buyer, _asset, _terms)
         ] = true;
-
-        emit ExchangeCreated(exchangeAddress, sender, _buyer, block.timestamp);
     }
 
     function isExchange(address _contract) external view returns (bool result) {

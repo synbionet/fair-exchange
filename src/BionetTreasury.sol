@@ -17,8 +17,7 @@ contract BionetTreasury is ITreasury, Ownable {
 
     function withdraw() external onlyOwner {
         uint256 bal = address(this).balance;
-        payable(owner()).sendValue(bal);
-
         emit FeeWithdraw(msg.sender, bal);
+        payable(owner()).sendValue(bal);
     }
 }

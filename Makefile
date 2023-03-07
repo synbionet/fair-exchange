@@ -1,4 +1,4 @@
-.PHONY: artifacts, deploy, clean-artifacts
+.PHONY: artifacts, deploy, clean-artifacts, analyze
 
 
 clean-artifacts:
@@ -12,3 +12,6 @@ artifacts:
 
 deploy:
 	forge script script/AnvilDeploy.s.sol:AnvilDeployScript --fork-url http://0.0.0.0:8545 --broadcast
+
+analyze: 
+	slither . --filter-path lib,tests,script  --foundry-out-directory build

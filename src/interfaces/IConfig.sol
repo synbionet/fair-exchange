@@ -4,6 +4,8 @@ pragma solidity 0.8.16;
 /// @dev Maintains configuration information used in Exchange and
 /// Factories.  Owned and controlled by the 'admin'.
 interface IConfig {
+    event ProtocolFeeUpdated(uint256 _value);
+
     function setProtocolFee(uint256 _basisPoints) external;
 
     function getProtocolFee() external view returns (uint256 value);
