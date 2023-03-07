@@ -8,11 +8,14 @@ import {InvariantBase} from "./InvariantBase.sol";
 import {ExchangeHandler} from "./actors/ExchangeHandler.sol";
 
 /// Invariant Tests:
-///  * A: ether balance >= escrow balance
-///  * B: fundAvailable == finalizedDate > 0
-///  * C: total escrow >= seller + buyer deposits
-///  * D: total withdraw <= totalEscrow
-///
+/// * Exchange
+///     * A: ether balance >= escrow balance
+///     * B: fundAvailable == finalizedDate > 0
+///     * C: total escrow >= seller + buyer deposits
+///     * D: total withdraw <= totalEscrow
+/// * Treasury
+///     * A: always increases
+///     * B: always >= sum of all escrow
 contract ExchangeInvariant is InvariantBase {
     ExchangeHandler handler;
 

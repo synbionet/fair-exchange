@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity 0.8.16;
 
 import {IConfig} from "./interfaces/IConfig.sol";
 
@@ -49,11 +49,9 @@ contract BionetConfig is IConfig, Ownable {
     /// External helpers
     /// ***
 
-    function calculateProtocolFee(uint256 _price)
-        external
-        view
-        returns (uint256 amount)
-    {
+    function calculateProtocolFee(
+        uint256 _price
+    ) external view returns (uint256 amount) {
         amount = (_price * feeBasisPoints) / 10_000;
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity 0.8.16;
 
 import {IConfig} from "./interfaces/IConfig.sol";
 import {IExchange} from "./interfaces/IExchange.sol";
@@ -195,11 +195,9 @@ contract BionetExchange is IExchange, BionetExchangeStorage {
     }
 
     /// @dev What's the escrow balance of the 'account'
-    function escrowBalance(address _account)
-        external
-        view
-        returns (uint256 bal)
-    {
+    function escrowBalance(
+        address _account
+    ) external view returns (uint256 bal) {
         bal = balanceOf[_account];
     }
 
@@ -276,11 +274,7 @@ contract BionetExchange is IExchange, BionetExchangeStorage {
     }
 
     /// @dev Move escrow between accounts
-    function _transfer(
-        address _from,
-        address _to,
-        uint256 _amount
-    ) internal {
+    function _transfer(address _from, address _to, uint256 _amount) internal {
         require(balanceOf[_from] >= _amount, "Exchange: Insufficient funds");
         balanceOf[_from] -= _amount;
         balanceOf[_to] += _amount;

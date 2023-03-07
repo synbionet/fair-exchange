@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity 0.8.16;
 
 interface ITreasury {
     event FeeDeposit(address indexed from, uint256 amount);

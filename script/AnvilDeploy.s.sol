@@ -7,8 +7,8 @@ import "../src/BionetExchange.sol";
 import "../src/BionetVoucher.sol";
 */
 
-import "forge-std/Script.sol";
-import "forge-std/console2.sol";
+import {Script} from "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
 
 /**
  * Deploy contracts to local Anvil.  Owner is Anvil account 0
@@ -17,7 +17,8 @@ contract AnvilDeployScript is Script {
     uint256 constant OWNER_PRIV_KEY =
         0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
-    function run() public {
+    function run() public view {
+        console.log("BROKEN - UPDATE!");
         /*
         vm.startBroadcast(OWNER_PRIV_KEY);
 

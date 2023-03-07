@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity 0.8.16;
 
 /// @dev Maintains configuration information used in Exchange and
 /// Factories.  Owned and controlled by the 'admin'.
@@ -16,8 +16,7 @@ interface IConfig {
 
     function getExchangeTemplate() external view returns (address value);
 
-    function calculateProtocolFee(uint256 _price)
-        external
-        view
-        returns (uint256 amount);
+    function calculateProtocolFee(
+        uint256 _price
+    ) external view returns (uint256 amount);
 }
