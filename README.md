@@ -50,7 +50,7 @@ Completed --> [*]
 Resolved --> [*]
 Arbitrate --> [*]
 ```
-*Based heavily on the boson protocol state machine*
+*Work in progress - not final*
 
 ### Timers
 Timers are used to motivate action.  The buyer and seller are the ones assessing what's happening - filling the gap from the Oracle problem. Either the buyer and seller must act or the protocol will act for them, possibly resulting in a penalty.
@@ -151,7 +151,7 @@ erDiagram
     KYB ||--|{ Users: registers
     Users ||--|{ Exchange: belong
     Users ||--|| ReputationToken: hasOne
-    Exchange ||--|| IPToken: hasOne
+    Exchange }|--|| ServiceToken: associated_with
 ``` 
 
 ## Sufficiently Decentralized
