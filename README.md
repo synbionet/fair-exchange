@@ -75,16 +75,16 @@ The buyer has committed to the offer.  At a minumum, the buyer is required to de
 
 A timer is started.  See "Canceled"
 
-## Canceled
+#### Canceled
 Either the 'committed' timer has expired or the seller has explicitly canceled the exchange. If the seller cancels, the buyer will be refunded all funds deposited and the seller will forfeit any deposit made to the exchange.  Likewise, if the timer expires before the seller 'ships' a cancel will be applied.
 
-### Shipped
+#### Shipped
 The seller has shipped the product. Emitting an event the may include a hash of the shipping information and signalling to the buyer the product is in transit.  
 
 Shipped starts a new timer to track the state of the transaction.  Within the timer, a buyer has an opportunity to 'dispute' the exchange (discussed below).  If the timer expires or the buyer initiates 
 a 'completed' transaction, the exchange is finalized.
 
-### Completed
+#### Completed
 Signifies a successful completion of the exchange.  Funds are released from escrow.  The seller is paid the 'price' of the product and refunded any deposit made.  Buyer is refunded any deposit made. A fee is paid to the protocol
 
 #### Disputed
