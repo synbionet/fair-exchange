@@ -24,33 +24,29 @@ The current state of SynBio often requires off-chain negotiation related to an e
 
 ```mermaid
 stateDiagram-v2
-[*] --> Offer: seller
-Offer --> Completed: **timeout
-Offer --> Committed: buyer
+    [*] --> Offer: seller
+    Offer --> Committed: buyer
+    Offer --> Completed: **timeout
 
-Committed --> Canceled: timeout
-Committed --> Revoked: seller
-Committed --> Canceled: buyer
-Committed --> Redeemed: buyer
+    Committed --> Canceled: timeout
+    Committed --> Canceled: seller
+    Committed --> Shipped: seller
 
-Redeemed --> Completed: timeout
-Redeemed --> Completed: buyer
-Redeemed --> Disputed: buyer
+    Shipped --> Disputed: buyer
+    Shipped --> Completed: buyer
+    Shipped --> Completed: timeout
 
-Disputed --> Retracted: buyer
-Disputed --> Resolved
-Disputed --> Arbitrate
-Disputed --> Arbitrate: timeout
+    Disputed --> Resolved: buyer
+    Disputed --> Arbitrated: timeout    
+    Disputed --> Completed: buyer
 
-Retracted --> Completed
 
-Canceled --> [*]
-Revoked --> [*]
-Completed --> [*]
-Resolved --> [*]
-Arbitrate --> [*]
+    Completed --> [*]
+    Canceled --> [*]
+    Resolved --> [*]
+    Arbitrated --> [*]
 ```
-*Work in progress - not final*
+*Simplified version derived from the Boson protocol* 
 
 ### Timers
 Timers are used to motivate action.  The buyer and seller are the ones assessing what's happening - filling the gap from the Oracle problem. Either the buyer and seller must act or the protocol will act for them, possibly resulting in a penalty.
@@ -59,88 +55,49 @@ Timers are used to motivate action.  The buyer and seller are the ones assessing
 
 #### Offer
 Seller creates an exchange with a specific buyer.  The exchange contains the following information:
-- Natural language terms and conditions
-- URI of terms and conditions (optional)
-- Hash value of the terms and conditions (fingerprint of the document)
+- Natural language terms and conditions. Exchanged between buyer and seller.
+  - (Optional) URI of terms and conditions
+  - Hash value of the terms and conditions
 - Price
 - Seller deposit (optional)
 - Buyer deposit (optional)
-- Other timer settings: redeem, dispute, and offer period
 
 If a seller deposit is specified it must be submitted with the offer.
 
 Optional items:
 - A timer may be set to specify the amount of time a buyer has to commit before the offer expires.
-- URI of terms and conditions. The parties may not want details to be public. In this case, both parties have a copy and can verify with the hash value published on-chain
+- URI of terms and conditions. The parties may not want details to be public. In this case, both parties have a local copy and can verify with the hash value published on-chain
 - Deposits may not be required. This could effect the trustworthiness of the interaction. For example, if a seller doesn't make  a deposit, there's no penalty for them deviating from the protocol.
 
 
 #### Committed
-The buyer has committed to the offer.  At a minumum, the buyer is required to deposit the agreed 'price' of the offer and any buyer deposit specified in the offer.
+The buyer has committed to the offer.  At a minumum, the buyer is required to deposit the agreed 'price' of the offer and any addiitonal buyer deposit specified in the offer. In the case of SynBio services, this is when the seller may start work to create the product.
 
-In the case of SynBio services, this is when the seller may start work to create the product.  In the meantime, the protocol issues a redeemable NFT (rNFT) to the buyer. The rNFT serves as proof of purchase and a way for the buyer to signal to the seller to ship the product by redeeming it (burning).
+A timer is started.  See "Canceled"
 
-In the Boson protocol, the rNFT can also be used to trade and sell the offer in other markets. This may not be (initially) desirable in SynBio. So an rNFT may be non-transferable.
+## Canceled
+Either the 'committed' timer has expired or the seller has explicitly canceled the exchange. If the seller cancels, the buyer will be refunded all funds deposited and the seller will forfeit any deposit made to the exchange.  Likewise, if the timer expires before the seller 'ships' a cancel will be applied.
 
-The redeem timer starts in this phase.  It specifies the amount of time to pass before the rNFT should be redeemed.
+### Shipped
+The seller has shipped the product. Emitting an event the may include a hash of the shipping information and signalling to the buyer the product is in transit.  
 
-What could go wrong?
-- Seller can't meet the terms of the offer
-- Buyer decides they no longer want it
-- Buyer fails to act  / redeem the offer
+Shipped starts a new timer to track the state of the transaction.  Within the timer, a buyer has an opportunity to 'dispute' the exchange (discussed below).  If the timer expires or the buyer initiates 
+a 'completed' transaction, the exchange is finalized.
 
-Regardless of the reason, the exchange needs a way to keep track of what's happening in the physical world with the offer. So it relies on the buyer and seller to tell it via a couple options:
-*Note: the seller has not shipped the item yet*
-- Seller revokes: buyer is refunded the 'price' and the seller's deposit (if any)
-- Buyer cancels: buyer is refunded 'price' less buyer's deposit (if any)
-- Redeem timer expires:  Same as buyer canceling
-
-Any of the above can result in the end of the exchange. Otherwise the buyer redeems in a timely fashion and the state moves to the next phase.
-
-
-#### Redeemed
-The buyer redeems the rNFT. This burns the token signalling to the seller to ship the product - the buyer is ready to take custody.  It also starts a dispute timer. 
-
-The dispute timer is provided to allow the buyer time to receive and evaluate the product. 
-
-What could go wrong?
-- Shipping is delayed, 
-- Sent to the wrong place
-- Damaged in transit
-- Product is not what the buyer expected
-
-If the buyer accepts the product, they can close out the exchange by sending a 'completed' transactions. 
-
-If the buyer does nothing and the dispute timer expires, the protocol will automatically move to the 'completed' state.
-
-The 'completed' state releases funds per the agreement: seller gets paid and both parties are refunded any deposits made.
-
-Otherwise, the buyer can dispute the exchange.
+### Completed
+Signifies a successful completion of the exchange.  Funds are released from escrow.  The seller is paid the 'price' of the product and refunded any deposit made.  Buyer is refunded any deposit made. A fee is paid to the protocol
 
 #### Disputed
-Only the buyer can dispute the exchange. Doing so starts the dispute phase timer. During this phase the buyer and seller work to resolve the issue. There are a few paths available to the buyer:
-1. Retract the dispute and move to completing the exchange per the original agreed upon terms. Retracting leads to the 'completed' state where funds are released.
-2. Parties agree to terms that resolve the dispute. For example the seller agrees to some form of refund. This will release funds based upon the agreed distribution.
-3. Arbitrate - a mutual resolution cannot be reached and an external arbitrator is needed to resolve the issue. Further research is needed for how this may work in SynBio.
+Only the buyer can dispute an exchange. Doing so starts the dispute phase timer. During this phase the buyer and seller work to resolve the issue. There are a few paths available to the buyer:
+1. Completed:  the buyer retracts the dispute and the exchange is finalized (see completed).
+2. Resolved: the buyer and seller have agreed to resolve the issue. Funds are release. This may include some form of dividing the escrowed funds.
+3. Timeout: if neither party acts, the protocol will resort to some form of arbitration.  Further research is needed to determine how the protocol should handle this.
 
-If the dispute timer expires before anything can be resolved, the protocol will continue to hold the funds and automatically move to arbitration.
-
-
-### Final states
-Indictates the Exchange is closed
-* **Canceled**: Buyer aborts or redeem timer expires.  Buyer may pay a penalty
-* **Revoked**: Seller aborts. May pay a penalty
-* **Completed**: Exchange completed per terms. Seller is paid, buyer is refunded their deposit (if any). Protocol receives a fee.
-* **Retracted**: Buyer disputed but changed their mind.  Exchange completes as normal (see 'completed')
-* **Resolved**: Parties reach an agreement to resolve the issue. May result in a refund, etc...
-* **Arbitrate**: An external party decides on resoltion. May result in a refund and or additional penalties
-
-An exchange works best with proper rewards and penalties in place. Without them, an irrational, spiteful party can lock up funds, destroying trust in the system.
-
+Overall, an exchange works best with proper rewards and penalties in place. Without them, an irrational, spiteful party can lock up funds, destroying trust in the system.
 
 ## Contracts
 
-While much of this work is based on the ideas and concepts outlined by the Boson protocol. We are exploring a different architecture that is simpler and a bit more decoupled than the Diamond pattern used by Boson. One of the motivations for that is by using independent exchanges we can reduce the attack surface of escrowed funds.
+While much of this work is based on the ideas and concepts outlined by the Boson protocol. We are exploring a different architecture that is simpler and a bit more decoupled than the Diamond pattern used by Boson. One of the motivations for that is by using independent exchanges we may be able to  reduce the attack surface of escrowed funds.
 
 ```mermaid
 erDiagram
@@ -153,6 +110,7 @@ erDiagram
     Users ||--|| ReputationToken: hasOne
     Exchange }|--|| ServiceToken: associated_with
 ``` 
+*Rough outline of contracts. Subject to change*
 
 ## Sufficiently Decentralized
 
@@ -167,7 +125,7 @@ For example, with SynBio the Web2 side should collect the minimal information ne
 * Order/Workflow 
 * Contact information
 
-This information can be backfilled from contract events and external data such as metadata from an NFT's URI. This is ok, as that information is available on-chain or in decentralized storage. As for the information stored on the Web2 side, users should have the ability to delete their data if they choose.
+This information can be backfilled from contract events and external data such as metadata from a Service tokens's URI. This is ok, as that information is available on-chain or in decentralized storage. As for the information stored on the Web2 side, users should have the ability to delete their data if they choose.
 
 ```mermaid
 graph TD
