@@ -124,6 +124,8 @@ interface IBionetExchange {
 
     function getEscrowBalance(address _account) external view returns (uint256);
 
+    function getAvailableToWithdrawEscrowBalance(address _account) external view returns (uint256);
+
     function getProtocolBalance() external view returns (uint256);
 
     function getOffer(uint256 _offerId)

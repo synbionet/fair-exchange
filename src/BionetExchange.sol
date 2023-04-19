@@ -375,6 +375,15 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         bal = ExchangeStorage.funds().escrow[_account];
     }
 
+    /// @dev Return the availableToWithdraw balance of 'account'
+    function getAvailableToWithdrawEscrowBalance(address _account)
+        external
+        view
+        returns (uint256 bal)
+    {
+        bal = ExchangeStorage.funds().availableToWithdraw[_account];
+    }
+
     /// @dev Return the protocol balance
     function getProtocolBalance() external view returns (uint256 bal) {
         bal = ExchangeStorage.funds().fees;

@@ -50,6 +50,18 @@ contract BionetRouter is Ownable, IBionetRouter {
         bal = IBionetExchange(exchangeAddress).getEscrowBalance(_account);
     }
 
+    /// @dev Return the escrow balance that is available to withdraw for the given account
+    /// @param _account to check
+    /// @return bal of the account
+    function getAvailableToWithdrawEscrowBalance(address _account)
+        external
+        view
+        noZeroAddress
+        returns (uint256 bal)
+    {
+        bal = IBionetExchange(exchangeAddress).getAvailableToWithdrawEscrowBalance(_account);
+    }
+
     /// @dev Get an exchange for the given ID
     /// @param _exchangeId of the exchange
     /// @return exists true if the exchange exists
