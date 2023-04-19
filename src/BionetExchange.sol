@@ -76,6 +76,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(_caller == offer.seller, "Exchange: caller must be the seller");
         offer.voided = true;
 
+        // make deposit available to withdraw after void
+        uint256 deposit = FundsLib.calculateFee(offer.price, CANCEL_REVOKE_FEE);
+        ExchangeStorage.funds().availableToWithdraw[_caller] += deposit;
+
         emit OfferVoided(_offerId, _caller);
     }
 
