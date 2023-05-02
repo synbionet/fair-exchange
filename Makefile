@@ -1,14 +1,13 @@
-.PHONY: artifacts, deploy, clean-artifacts
-
+.PHONY: artifacts, anvil_deploy, clean-artifacts
 
 clean-artifacts:
 	rm -rf artifacts
 
 artifacts: 
 	mkdir -p artifacts
-	cp ./out/BionetRouter.sol/BionetRouter.json artifacts/BionetRouter.json
-	cp ./out/BionetVoucher.sol/BionetVoucher.json artifacts/BionetVoucher.json
-	cp ./out/BionetExchange.sol/BionetExchange.json artifacts/BionetExchange.json
+	cp ./out/ExchangeFacet.sol/ExchangeFacet.json artifacts/ExchangeFacet.json
+	cp ./out/ServiceFacet.sol/ServiceFacet.json artifacts/ServiceFacet.json
+	cp ./out/FromStorage.sol/FromStorage.json artifacts/FromStorage.json
 
-deploy:
-	forge script script/AnvilDeploy.s.sol:AnvilDeployScript --fork-url http://0.0.0.0:8545 --broadcast
+anvil_deploy:
+	forge script script/Deploy.s.sol:AnvilDeployScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv

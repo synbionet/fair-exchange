@@ -5,8 +5,6 @@ Fair Exchange is a protocol to enable the exchange of goods and services on the 
 
 Our current effort is focused on a minimal viable product (MVP).  We're intentionally keeping the core logic as simple as possible as we work through the needs of the Synthetic Biology (SynBio) community.  
 
-This work is **heavily** inspired by the great work on the [Boson protocol](https://www.bosonprotocol.io/technology/) and other research related to "fair exchange". We are adapting/extending some of Boson's concepts to support IP NFTS and the unique needs of the Bionet. We may transition to the Boson protocol in the future.
-
 ## Design
 There are 3 main actors in the protocol: **buyer**, **seller**, and the **exchange**. A buyer and seller may want to exchange both digital and physical assets. The exchange contains the core logic and state machine. A state machine ensures the buyer and seller follow the rules of the system. Each state dictates the rewards and penalities that may impact the exchange.  The goal is to incentive participants to follow the rules.  And by following the rules, both parties get what they want, which helps to build trust in the system over time.
 
@@ -37,7 +35,6 @@ To deal with the need for off-chain negotiations in SynBio and the potential for
 
 Overall, this is designed to keep the process moving.  Either the buyer and seller must act or the protocol will act for them.
 
-![State Diagrem](./docs/fair-exchange-state.svg)
 
 ## Fees
 Fees are used to incentive actors to do the right thing.  For example, a seller is less likely to revoke a sale when they have to pay to do so. 
