@@ -1,4 +1,4 @@
-.PHONY: artifacts, anvil_deploy, clean-artifacts
+.PHONY: artifacts, anvil_deploy, clean-artifacts, test
 
 clean-artifacts:
 	rm -rf artifacts
@@ -11,3 +11,6 @@ artifacts:
 
 anvil_deploy:
 	forge script script/Deploy.s.sol:AnvilDeployScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
+
+test:
+	forge test --ffi -vv
