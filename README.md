@@ -62,5 +62,8 @@ To deploy to Anvil, run:
 ```bash
 > make anvil_deploy
 ```
+The deployed diamond address is logged to the console.
+
+
 
 
