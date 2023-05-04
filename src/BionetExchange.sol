@@ -76,6 +76,10 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         require(_caller == offer.seller, "Exchange: caller must be the seller");
         offer.voided = true;
 
+        // make deposit available to withdraw after void
+        uint256 deposit = FundsLib.calculateFee(offer.price, CANCEL_REVOKE_FEE);
+        ExchangeStorage.funds().availableToWithdraw[_caller] += deposit;
+
         emit OfferVoided(_offerId, _caller);
     }
 
@@ -369,6 +373,15 @@ contract BionetExchange is IBionetExchange, ReentrancyGuard {
         returns (uint256 bal)
     {
         bal = ExchangeStorage.funds().escrow[_account];
+    }
+
+    /// @dev Return the availableToWithdraw balance of 'account'
+    function getAvailableToWithdrawEscrowBalance(address _account)
+        external
+        view
+        returns (uint256 bal)
+    {
+        bal = ExchangeStorage.funds().availableToWithdraw[_account];
     }
 
     /// @dev Return the protocol balance

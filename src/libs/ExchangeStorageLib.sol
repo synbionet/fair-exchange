@@ -128,6 +128,7 @@ library ExchangeStorage {
         uint256 bal = funds().escrow[_account];
         require(bal >= amount, "Insufficient funds!");
         funds().escrow[_account] -= amount;
+        funds().availableToWithdraw[_account] -= amount;
         funds().totalEscrow -= amount;
     }
 
