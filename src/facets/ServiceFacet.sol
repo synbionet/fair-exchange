@@ -19,6 +19,7 @@ contract ServiceFacet is WithStorage {
     // a service is created
     event ServiceCreated(
         uint256 indexed id,
+        address indexed owner,
         string name,
         string uri,
         uint256 when
@@ -49,7 +50,7 @@ contract ServiceFacet is WithStorage {
             active: true
         });
 
-        emit ServiceCreated(sid, _name, _uri, block.timestamp);
+        emit ServiceCreated(sid, msg.sender, _name, _uri, block.timestamp);
     }
 
     /// @dev return the Service for a given ID.
