@@ -17,7 +17,12 @@ contract ServiceFacet is WithStorage {
     // the meta uri has changed
     event ServiceUpdatedMetaUri(uint256 indexed id, string uri, uint256 when);
     // a service is created
-    event ServiceCreated(uint256 indexed id, string name, string uri, uint256 when);
+    event ServiceCreated(
+        uint256 indexed id,
+        string name,
+        string uri,
+        uint256 when
+    );
 
     /// @dev Create a service. The owner will be the caller.
     ///

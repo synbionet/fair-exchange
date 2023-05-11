@@ -69,6 +69,7 @@ struct ExchangeArgs {
     uint16 moderatorPercentage;
     uint128 price;
     uint256 disputeTimerValue;
+    string uri;
 }
 
 /// @dev Calldata to Exchange.Fund.  Information used to sign an ERC20 permit

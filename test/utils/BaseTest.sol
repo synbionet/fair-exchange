@@ -83,11 +83,16 @@ abstract contract BaseTest is SelectorHelper {
 
         // Deploy the init
         BionetInit bInit = new BionetInit();
-        InitArgs memory _args =
-            InitArgs({treasury: address(t), usdc: address(usdc), protocolFee: 200});
+        InitArgs memory _args = InitArgs({
+            treasury: address(t),
+            usdc: address(usdc),
+            protocolFee: 200
+        });
         // Encode the calldata
-        bytes memory initCalldata =
-            abi.encodeWithSignature("init((address,address,uint256))", _args);
+        bytes memory initCalldata = abi.encodeWithSignature(
+            "init((address,address,uint256))",
+            _args
+        );
 
         // Setup da cuts...
         IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](5);
@@ -132,17 +137,26 @@ abstract contract BaseTest is SelectorHelper {
             })
         );
 
-        IDiamondCut(diamondAddress).diamondCut(cut, address(bInit), initCalldata);
+        IDiamondCut(diamondAddress).diamondCut(
+            cut,
+            address(bInit),
+            initCalldata
+        );
 
         // Deploy a service for testing owned by the seller
         vm.startPrank(seller);
-        serviceId =
-            ServiceFacet(diamondAddress).createService(serviceName, serviceUri);
+        serviceId = ServiceFacet(diamondAddress).createService(
+            serviceName,
+            serviceUri
+        );
         vm.stopPrank();
     }
 
     function makeService() internal returns (uint256 sid) {
-        sid = ServiceFacet(diamondAddress).createService(serviceName, serviceUri);
+        sid = ServiceFacet(diamondAddress).createService(
+            serviceName,
+            serviceUri
+        );
     }
 
     function defaultExchangeArgs()
@@ -156,7 +170,8 @@ abstract contract BaseTest is SelectorHelper {
             moderator: moderator,
             moderatorPercentage: defaultModeratorFee,
             price: defaultPrice,
-            disputeTimerValue: defaultDisputeTime
+            disputeTimerValue: defaultDisputeTime,
+            uri: "ar://txid"
         });
     }
 

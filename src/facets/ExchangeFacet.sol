@@ -1,24 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity 0.8.16;
 
-import {
-    Exchange,
-    ExchangeArgs,
-    ExchangeState,
-    OFFER_EXPIRES,
-    RESOLVE_EXPIRES,
-    ExchangePermitArgs,
-    Service,
-    RefundType
-} from "../BionetTypes.sol";
+import {Exchange, ExchangeArgs, ExchangeState, OFFER_EXPIRES, RESOLVE_EXPIRES, ExchangePermitArgs, Service, RefundType} from "../BionetTypes.sol";
 import {LibFee} from "../libraries/LibFee.sol";
 import {WithStorage} from "../libraries/LibStorage.sol";
-import {
-    NoZeroAddress,
-    UnAuthorizedCaller,
-    InsufficientFunds,
-    MissingOrInvalidService
-} from "../Errors.sol";
+import {NoZeroAddress, UnAuthorizedCaller, InsufficientFunds, MissingOrInvalidService} from "../Errors.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
@@ -50,10 +36,12 @@ contract ExchangeFacet is WithStorage {
     /// Called when an exchange is initialized
     event Offered(
         uint256 indexed exchangeId,
-        address indexed buyer,
-        address indexed seller,
+        uint256 indexed serviceId,
+        address buyer,
+        address seller,
         address moderator,
-        uint256 when
+        uint256 when,
+        string uri
     );
     /// When funded
     event Funded(uint256 indexed exchangeId, uint256 price, uint256 when);
@@ -89,8 +77,9 @@ contract ExchangeFacet is WithStorage {
     {
         Exchange memory info = bionetStore().exchanges[_exchangeId];
         if (
-            info.state == ExchangeState.Voided || info.state == ExchangeState.Offered
-                || info.state == ExchangeState.Completed
+            info.state == ExchangeState.Voided ||
+            info.state == ExchangeState.Offered ||
+            info.state == ExchangeState.Completed
         ) bal = 0;
 
         bal = info.price;
@@ -118,27 +107,34 @@ contract ExchangeFacet is WithStorage {
         if (_args.disputeTimerValue == 0) revert MissingDisputeExpiration();
 
         Service memory serv = bionetStore().services[_args.serviceId];
-        if (serv.owner != seller || !serv.active) revert MissingOrInvalidService();
+        if (serv.owner != seller || !serv.active)
+            revert MissingOrInvalidService();
 
         // TODO: Check buyer is vetted
 
         eid = counters().nextExchangeId++;
+        bionetStore().exchanges[eid].serviceId = _args.serviceId;
         bionetStore().exchanges[eid].seller = seller;
         bionetStore().exchanges[eid].buyer = _args.buyer;
         bionetStore().exchanges[eid].price = _args.price;
         bionetStore().exchanges[eid].state = ExchangeState.Offered;
-        bionetStore().exchanges[eid].disputeTimerValue = _args.disputeTimerValue;
+        bionetStore().exchanges[eid].disputeTimerValue = _args
+            .disputeTimerValue;
+        bionetStore().exchanges[eid].uri = _args.uri;
 
         // timers:
 
         // Offer expires in 15 days
-        bionetStore().exchanges[eid].offerExpires = block.timestamp + OFFER_EXPIRES;
+        bionetStore().exchanges[eid].offerExpires =
+            block.timestamp +
+            OFFER_EXPIRES;
 
         // Time allocated to resolve a dispute (30 days). Note: this time is updated
         // when dispute is called.  It's set as a default here to ensure it has a
         // value.
         bionetStore().exchanges[eid].resolveExpires =
-            block.timestamp + RESOLVE_EXPIRES;
+            block.timestamp +
+            RESOLVE_EXPIRES;
 
         // Adjust moderator information
         if (_args.price == 0) {
@@ -147,11 +143,19 @@ contract ExchangeFacet is WithStorage {
             bionetStore().exchanges[eid].moderator = address(0x0);
         } else {
             bionetStore().exchanges[eid].moderator = _args.moderator;
-            bionetStore().exchanges[eid].moderatorPercentage =
-                _args.moderatorPercentage;
+            bionetStore().exchanges[eid].moderatorPercentage = _args
+                .moderatorPercentage;
         }
 
-        emit Offered(eid, _args.buyer, seller, _args.moderator, block.timestamp);
+        emit Offered(
+            eid,
+            _args.serviceId,
+            _args.buyer,
+            seller,
+            _args.moderator,
+            block.timestamp,
+            _args.uri
+        );
     }
 
     /// @dev Check if the exchange is closed (complete or voided)
@@ -204,7 +208,8 @@ contract ExchangeFacet is WithStorage {
         } else {
             // Check the buyer has sufficient funds
             ERC20 usdc = ERC20(bionetStore().usdc);
-            if (usdc.balanceOf(msg.sender) < ex.price) revert InsufficientFunds();
+            if (usdc.balanceOf(msg.sender) < ex.price)
+                revert InsufficientFunds();
 
             ex.state = ExchangeState.Funded;
             ex.disputeExpires = block.timestamp + ex.disputeTimerValue;
@@ -222,7 +227,10 @@ contract ExchangeFacet is WithStorage {
 
             // transfer 'escrow' to this exchange
             SafeTransferLib.safeTransferFrom(
-                usdc, msg.sender, address(this), ex.price
+                usdc,
+                msg.sender,
+                address(this),
+                ex.price
             );
 
             // Emit event
@@ -356,8 +364,10 @@ contract ExchangeFacet is WithStorage {
         if (!valid) revert UnAuthorizedCaller();
 
         // if the exchanged is already 'closed' there's nothing else to check
-        if (ex.state == ExchangeState.Completed || ex.state == ExchangeState.Voided)
-        {
+        if (
+            ex.state == ExchangeState.Completed ||
+            ex.state == ExchangeState.Voided
+        ) {
             return false;
         }
 
@@ -381,8 +391,10 @@ contract ExchangeFacet is WithStorage {
         }
 
         // if in 'Dispute' or 'Resolve' and timer expired -> finalize
-        if (ex.state == ExchangeState.Disputed || ex.state == ExchangeState.Resolved)
-        {
+        if (
+            ex.state == ExchangeState.Disputed ||
+            ex.state == ExchangeState.Resolved
+        ) {
             if (_isTimerExpired(ex.resolveExpires)) {
                 paySellerAndProtocol(ex);
                 return true;
@@ -404,7 +416,9 @@ contract ExchangeFacet is WithStorage {
     /// @dev Finalize the exchange and release funds if price != 0
     function paySellerAndProtocol(Exchange storage ex) internal {
         if (ex.price != 0) {
-            (uint256 dueSeller, uint256 dueProtocol) = LibFee.payoutAndFee(ex.price);
+            (uint256 dueSeller, uint256 dueProtocol) = LibFee.payoutAndFee(
+                ex.price
+            );
             releaseFunds(ex, dueSeller, 0, 0, dueProtocol);
         } else {
             ex.state = ExchangeState.Completed;
@@ -428,10 +442,16 @@ contract ExchangeFacet is WithStorage {
         if (_sellerAmt > 0) {
             SafeTransferLib.safeTransfer(usdc, ex.seller, _sellerAmt);
         }
-        if (_buyerAmt > 0) SafeTransferLib.safeTransfer(usdc, ex.buyer, _buyerAmt);
-        if (_modAmt > 0) SafeTransferLib.safeTransfer(usdc, ex.moderator, _modAmt);
+        if (_buyerAmt > 0)
+            SafeTransferLib.safeTransfer(usdc, ex.buyer, _buyerAmt);
+        if (_modAmt > 0)
+            SafeTransferLib.safeTransfer(usdc, ex.moderator, _modAmt);
         if (_protoAmt > 0) {
-            SafeTransferLib.safeTransfer(usdc, bionetStore().treasury, _protoAmt);
+            SafeTransferLib.safeTransfer(
+                usdc,
+                bionetStore().treasury,
+                _protoAmt
+            );
         }
 
         emit Completed(ex.id, block.timestamp);
