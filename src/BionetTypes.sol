@@ -61,7 +61,6 @@ struct Service {
 /// *** Structs used as argument to calls *** ///
 
 /// @dev The calldata to create an Exchange
-/// TODO: Add Service info
 struct ExchangeArgs {
     uint256 serviceId;
     address buyer;
