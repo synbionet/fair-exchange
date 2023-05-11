@@ -56,7 +56,7 @@ contract AnvilDeployScript is Script, SelectorHelper {
     }
 
     function run() public {
-        vm.broadcast(deployer);
+        vm.startBroadcast(deployer);
 
         // deploy treasure and stablecoin (mock). They are outside of diamond
         // address
@@ -81,8 +81,9 @@ contract AnvilDeployScript is Script, SelectorHelper {
         OwnershipFacet ownerF = new OwnershipFacet();
 
         // deploy diamond
-        address diamondAddress =
-            address(new Diamond(address(this), address(dCutFacet)));
+        address diamondAddress = address(
+            new Diamond(deployer, address(dCutFacet))
+        );
 
         // Deploy the init w/args
         BionetInit bInit = new BionetInit();
@@ -92,8 +93,10 @@ contract AnvilDeployScript is Script, SelectorHelper {
             protocolFee: defaultProtocolFee
         });
         // Encode the calldata
-        bytes memory initCalldata =
-            abi.encodeWithSignature("init((address,address,uint256))", _args);
+        bytes memory initCalldata = abi.encodeWithSignature(
+            "init((address,address,uint256))",
+            _args
+        );
 
         // Setup da cuts...
         IDiamondCut.FacetCut[] memory cut = new IDiamondCut.FacetCut[](5);
@@ -138,7 +141,11 @@ contract AnvilDeployScript is Script, SelectorHelper {
             })
         );
 
-        IDiamondCut(diamondAddress).diamondCut(cut, address(bInit), initCalldata);
+        IDiamondCut(diamondAddress).diamondCut(
+            cut,
+            address(bInit),
+            initCalldata
+        );
 
         console.log("~ addresses: ~");
         console.log("USDC: %s", address(usdc));
