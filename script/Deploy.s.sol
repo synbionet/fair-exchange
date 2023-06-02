@@ -51,8 +51,7 @@ contract AnvilDeployScript is Script, SelectorHelper {
         buyer = vm.addr(vm.deriveKey(mnemonic, 1));
         seller = vm.rememberKey(vm.deriveKey(mnemonic, 2));
         moderator = vm.rememberKey(vm.deriveKey(mnemonic, 3));
-
-        deployer = moderator = vm.rememberKey(vm.deriveKey(mnemonic, 4));
+        deployer = vm.rememberKey(vm.deriveKey(mnemonic, 4));
     }
 
     function run() public {
