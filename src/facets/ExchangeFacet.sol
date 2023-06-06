@@ -255,7 +255,7 @@ contract ExchangeFacet is WithStorage {
         if (ex.state != ExchangeState.Funded) revert InValidState();
 
         // We don't check a timer here as the effect is the same.
-        paySellerAndProtocol(ex);
+        paySellerAndProtocol(_exchangeId);
     }
 
     /// @dev Called by buyer to dispute an exchange. Changes state to
@@ -336,7 +336,13 @@ contract ExchangeFacet is WithStorage {
             uint256 dueModerator,
             uint256 dueProtocol
         ) = LibFee.refund(ex.refundType, ex.moderatorPercentage, ex.price);
-        releaseFunds(ex, dueSeller, dueBuyer, dueModerator, dueProtocol);
+        releaseFunds(
+            _exchangeId,
+            dueSeller,
+            dueBuyer,
+            dueModerator,
+            dueProtocol
+        );
 
         emit Refunded(_exchangeId, msg.sender, block.timestamp);
     }
@@ -375,7 +381,7 @@ contract ExchangeFacet is WithStorage {
         if (ex.state == ExchangeState.Offered) {
             if (_isTimerExpired(ex.offerExpires)) {
                 ex.state = ExchangeState.Voided;
-                emit Voided(ex.id, block.timestamp);
+                emit Voided(_exchangeId, block.timestamp);
                 return true;
             }
             return false;
@@ -384,7 +390,7 @@ contract ExchangeFacet is WithStorage {
         // if in 'Fund' and timer expired -> finalize
         if (ex.state == ExchangeState.Funded) {
             if (_isTimerExpired(ex.disputeExpires)) {
-                paySellerAndProtocol(ex);
+                paySellerAndProtocol(_exchangeId);
                 return true;
             }
             return false;
@@ -396,7 +402,7 @@ contract ExchangeFacet is WithStorage {
             ex.state == ExchangeState.Resolved
         ) {
             if (_isTimerExpired(ex.resolveExpires)) {
-                paySellerAndProtocol(ex);
+                paySellerAndProtocol(_exchangeId);
                 return true;
             }
             return false;
@@ -414,26 +420,29 @@ contract ExchangeFacet is WithStorage {
     }
 
     /// @dev Finalize the exchange and release funds if price != 0
-    function paySellerAndProtocol(Exchange storage ex) internal {
+    function paySellerAndProtocol(uint256 _exchangeId) internal {
+        Exchange storage ex = bionetStore().exchanges[_exchangeId];
         if (ex.price != 0) {
             (uint256 dueSeller, uint256 dueProtocol) = LibFee.payoutAndFee(
                 ex.price
             );
-            releaseFunds(ex, dueSeller, 0, 0, dueProtocol);
+            releaseFunds(_exchangeId, dueSeller, 0, 0, dueProtocol);
         } else {
             ex.state = ExchangeState.Completed;
-            emit Completed(ex.id, block.timestamp);
+            emit Completed(_exchangeId, block.timestamp);
         }
     }
 
     /// @dev Release funds to all parties as required. Transfers stablecoin tokens
     function releaseFunds(
-        Exchange storage ex,
+        uint256 _exchangeId,
         uint256 _sellerAmt,
         uint256 _buyerAmt,
         uint256 _modAmt,
         uint256 _protoAmt
     ) internal {
+        Exchange storage ex = bionetStore().exchanges[_exchangeId];
+
         ERC20 usdc = ERC20(bionetStore().usdc);
         // set state to complete
         ex.state = ExchangeState.Completed;
@@ -454,6 +463,6 @@ contract ExchangeFacet is WithStorage {
             );
         }
 
-        emit Completed(ex.id, block.timestamp);
+        emit Completed(_exchangeId, block.timestamp);
     }
 }

@@ -15,3 +15,7 @@ anvil_deploy:
 
 test:
 	forge test --ffi -vv
+
+run_sim: 
+	forge script script/Sim.s.sol:SimScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
+
