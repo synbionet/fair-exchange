@@ -2,16 +2,23 @@
 pragma solidity 0.8.16;
 
 import "forge-std/Script.sol";
-import "forge-std/console2.sol";
 
+import {USDC} from "../src/mocks/USDC.sol";
 import {SimBase} from "../simulation/SimBase.sol";
 import {RefundType} from "../src/BionetTypes.sol";
+import {SigUtils} from "../test/utils/SigUtils.sol";
 
-// Diamond address: 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
+contract SimScript is SimBase {
+    // Addressed when using Simbase deploy()
+    string constant DIA_ADDRESS = "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0";
+    string constant USD_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
-contract SimScript is Script, SimBase {
     function setUp() public {
         _setUpActors();
+        diamondAddress = vm.parseAddress(DIA_ADDRESS);
+        address usdcAddress = vm.parseAddress(USD_ADDRESS);
+
+        sigUtil = new SigUtils(USDC(usdcAddress).DOMAIN_SEPARATOR());
     }
 
     function _happyPathScenario() internal {
@@ -31,7 +38,7 @@ contract SimScript is Script, SimBase {
     }
 
     function run() public {
-        _deployBaseContracts();
-        _disputeResolveScenario();
+        _happyPathScenario();
+        //_disputeResolveScenario();
     }
 }

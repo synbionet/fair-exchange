@@ -34,7 +34,11 @@ struct Actor {
     uint256 secretKey;
 }
 
+/**
+ * Helper to write scripts for simulation andt testing
+ */
 contract SimBase is SelectorHelper, Script {
+    // Anvil's default mnemonic
     string constant ANVIL_MNEMONIC =
         "test test test test test test test test test test test junk";
 

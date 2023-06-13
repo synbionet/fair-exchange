@@ -10,8 +10,8 @@ artifacts:
 	cp ./out/FromStorage.sol/FromStorage.json artifacts/FromStorage.json
 	cp ./out/USDC.sol/USDC.json artifacts/USDC.json
 
-anvil_deploy:
-	forge script script/Deploy.s.sol:AnvilDeployScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
+local_deploy:
+	forge script script/LocalDeploy.s.sol:LocalDeployScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
 
 test:
 	forge test --ffi -vv

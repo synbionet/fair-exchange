@@ -60,9 +60,13 @@ import exchangefacetabi from "@synbionet/fair-exchange/artifacts/ExchangeFacet.j
 ## Deploy locally
 To deploy to Anvil, run:
 ```bash
-> make anvil_deploy
+> make local_deploy
 ```
 The deployed diamond address is logged to the console.
+
+## Using simulator contracts
+ TODO
+
 
 
 
