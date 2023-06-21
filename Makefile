@@ -1,14 +1,21 @@
-.PHONY: artifacts, deploy, clean-artifacts
-
+.PHONY: artifacts, anvil_deploy, clean-artifacts, test
 
 clean-artifacts:
 	rm -rf artifacts
 
 artifacts: 
 	mkdir -p artifacts
-	cp ./out/BionetRouter.sol/BionetRouter.json artifacts/BionetRouter.json
-	cp ./out/BionetVoucher.sol/BionetVoucher.json artifacts/BionetVoucher.json
-	cp ./out/BionetExchange.sol/BionetExchange.json artifacts/BionetExchange.json
+	cp ./out/ExchangeFacet.sol/ExchangeFacet.json artifacts/ExchangeFacet.json
+	cp ./out/ServiceFacet.sol/ServiceFacet.json artifacts/ServiceFacet.json
+	cp ./out/FromStorage.sol/FromStorage.json artifacts/FromStorage.json
+	cp ./out/USDC.sol/USDC.json artifacts/USDC.json
 
-deploy:
-	forge script script/AnvilDeploy.s.sol:AnvilDeployScript --fork-url http://0.0.0.0:8545 --broadcast
+local_deploy:
+	forge script script/LocalDeploy.s.sol:LocalDeployScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
+
+test:
+	forge test --ffi -vv
+
+run_sim: 
+	forge script script/Sim.s.sol:SimScript --rpc-url http://127.0.0.1:8545 --broadcast --ffi -vvvv
+
