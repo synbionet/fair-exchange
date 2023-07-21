@@ -8,6 +8,7 @@ artifacts:
 	cp ./out/ExchangeFacet.sol/ExchangeFacet.json artifacts/ExchangeFacet.json
 	cp ./out/ServiceFacet.sol/ServiceFacet.json artifacts/ServiceFacet.json
 	cp ./out/FromStorage.sol/FromStorage.json artifacts/FromStorage.json
+	cp ./out/Treasury.sol/Treasury.json artifacts/Treasury.json
 	cp ./out/USDC.sol/USDC.json artifacts/USDC.json
 
 local_deploy:
