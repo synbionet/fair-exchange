@@ -40,6 +40,7 @@ contract ExchangeFacet is WithStorage {
         address buyer,
         address seller,
         address moderator,
+        uint256 price,
         uint256 when,
         string uri
     );
@@ -60,21 +61,17 @@ contract ExchangeFacet is WithStorage {
     /// @param _exchangeId the id of the exchange
     /// @return exists true if exchange exists
     /// @return info a memory version of the Exchange
-    function getExchange(uint256 _exchangeId)
-        external
-        view
-        returns (bool exists, Exchange memory info)
-    {
+    function getExchange(
+        uint256 _exchangeId
+    ) external view returns (bool exists, Exchange memory info) {
         info = bionetStore().exchanges[_exchangeId];
         if (info.seller != address(0x0)) exists = true;
     }
 
     /// @dev Get the escrow balance for a given Exchange.  THis
-    function getEscrowBalance(uint256 _exchangeId)
-        external
-        view
-        returns (uint256 bal)
-    {
+    function getEscrowBalance(
+        uint256 _exchangeId
+    ) external view returns (uint256 bal) {
         Exchange memory info = bionetStore().exchanges[_exchangeId];
         if (
             info.state == ExchangeState.Voided ||
@@ -95,10 +92,9 @@ contract ExchangeFacet is WithStorage {
     /// Emits Offered
     /// @param _args Initial exchange information
     /// @return eid the new exchange identifier
-    function createOffer(ExchangeArgs calldata _args)
-        external
-        returns (uint256 eid)
-    {
+    function createOffer(
+        ExchangeArgs calldata _args
+    ) external returns (uint256 eid) {
         address seller = msg.sender;
         if (_args.buyer == address(0x0) || seller == address(0x0)) {
             revert NoZeroAddress();
@@ -153,6 +149,7 @@ contract ExchangeFacet is WithStorage {
             _args.buyer,
             seller,
             _args.moderator,
+            _args.price,
             block.timestamp,
             _args.uri
         );
@@ -187,9 +184,10 @@ contract ExchangeFacet is WithStorage {
     ///
     /// @param _exchangeId the exchange id
     /// @param _permit signed message from buyer to authorize the escrow
-    function fundOffer(uint256 _exchangeId, ExchangePermitArgs calldata _permit)
-        external
-    {
+    function fundOffer(
+        uint256 _exchangeId,
+        ExchangePermitArgs calldata _permit
+    ) external {
         Exchange storage ex = bionetStore().exchanges[_exchangeId];
 
         if (msg.sender != ex.buyer) revert UnAuthorizedCaller();
